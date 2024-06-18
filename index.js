@@ -1,55 +1,24 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
 const { Telegraf, Markup } = require('telegraf');
 const axios = require('axios');
-dotenv.config();
+const dotenv = require('dotenv');
+dotenv.config()
 
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// Initialize the Telegram bot
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-
-// Middleware to handle errors
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('Something went wrong!');
-});
-
-// Define routes
-app.get('/', (req, res) => {
-    res.send('Server started');
-});
 
 // Function to get the bot's profile photo
 async function getBotProfilePhoto() {
-    const cacheFilePath = path.resolve(__dirname, 'botProfilePhoto.json');
-    const botInfo = await bot.telegram.getMe();
-    const userId = botInfo.id;
-
     try {
-        // Check if cache file exists
-        if (fs.existsSync(cacheFilePath)) {
-            const cache = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
-            if (cache.userId === userId) {
-                // Return the cached file ID if it exists
-                return cache.fileId;
-            }
-        }
+        const botInfo = await bot.telegram.getMe();
+        const userId = botInfo.id;
 
         // Fetch the profile photos from the Telegram API
         const response = await axios.get(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUserProfilePhotos`, {
             params: { user_id: userId, limit: 1 }
         });
+
         const photos = response.data.result.photos;
         if (photos.length > 0) {
-            const fileId = photos[0][0].file_id;
-
-            // Cache the file ID and user ID
-            fs.writeFileSync(cacheFilePath, JSON.stringify({ userId, fileId }));
-            return fileId;
+            return photos[0][0].file_id; // Return the file_id of the first photo
         } else {
             throw new Error('No profile photos found');
         }
@@ -70,7 +39,7 @@ bot.start(async (ctx) => {
                 caption: `HELLO ${username}, I AM A MOVIE BOT ADD ME TO YOUR MOVIE CHAT GROUP`,
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
-                    [Markup.button.url('+ Add me to your group', 'http://t.me/movie_cast_bot?startgroup=true')],
+                    [Markup.button.url('+ Add me to your group +', 'http://t.me/movie_cast_bot?startgroup=true')],
                     [Markup.button.url('JOIN OUR SERIES CHANNEL', 'https://t.me/moviecastseriess')],
                     [Markup.button.url('JOIN OUR BACKUP CHANNEL', 'https://t.me/moviecastback')],
                     [Markup.button.url('JOIN OUR CHAT CHANNEL', 'https://t.me/filmpurchat1')],
@@ -97,7 +66,19 @@ bot.catch((err, ctx) => {
     ctx.reply('Oops! Something went wrong.');
 });
 
-// Start Express server
+// Expose the bot webhook handler through Vercel
+const express = require('express');
+const app = express();
+
+// Initialize bot webhook
+const path = `/api/telegram-bot`;
+app.use(express.json());
+app.post(path, (req, res) => {
+    bot.handleUpdate(req.body, res);
+});
+
+// Start the Express server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
 });
