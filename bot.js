@@ -175,6 +175,62 @@ bot.action(/prev_(\d+)/, async (ctx) => {
     await ctx.answerCbQuery();
 });
 
+// Handle 'watch' action
+bot.action(/watch_(.+)/, async (ctx) => {
+    const selectedVideoId = ctx.match[1]; // Extract _id from action
+    await ctx.answerCbQuery();
+
+    try {
+        // Retrieve the selected video from MongoDB using the Video model
+        const selectedVideo = await Video.findById(selectedVideoId);
+
+        if (!selectedVideo) {
+            await ctx.reply("Video not found.");
+            return;
+        }
+
+        let caption = selectedVideo.caption || "";
+        const videoFileId = selectedVideo.fileId;
+
+        // Remove usernames and channel URLs except for @moviecastback
+        caption = caption.replace(/@[A-Za-z0-9_]+/g, (match) => {
+            if (match.toLowerCase() === "@moviecastback") {
+                return match; // Keep @moviecastback as is
+            } else {
+                return ""; // Remove other usernames
+            }
+        });
+
+        // Append "Jᴏɪɴ ➥「 @moviecastback 」" if no usernames are left in caption
+        if (!/@[A-Za-z0-9_]+/g.test(caption)) {
+            caption += "\n\nJᴏɪɴ  ➥「 @moviecastback 」";
+        }
+
+        try {
+            // Attempt to send the video to @movie_cast_bot
+            const result = await ctx.telegram.sendVideo("@movie_cast_bot", videoFileId, { caption });
+
+            // Inform the user that the video is sent to @movie_cast_bot
+            await ctx.reply("Sent the video to @movie_cast_bot.");
+        } catch (error) {
+            if (error.code === 400 && error.description.includes('chat not found')) {
+                // If @movie_cast_bot chat not found, send the video to the user instead
+                await ctx.telegram.sendVideo(ctx.from.id, videoFileId, { caption });
+
+                // Inform the user that the video is sent directly to them
+                await ctx.reply("VIDEO UPLOADED HERE @movie_cast_bot");
+            } else {
+                console.error("Error sending video to @movie_cast_bot:", error);
+                ctx.reply("Failed to send the video to @movie_cast_bot. Please try again later.");
+            }
+        }
+    } catch (error) {
+        console.error("Error handling 'watch' action:", error);
+        ctx.reply("Failed to handle 'watch' action. Please try again later.");
+    }
+});
+
+
 // Catch Telegraf errors
 bot.catch((err, ctx) => {
     console.error('Telegraf error:', err);
