@@ -6,11 +6,13 @@ const { Video } = require('./models/video'); // Assuming you have a Video model
 dotenv.config();
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI).then(() => {
-    console.log('Connected to MongoDB');
-}).catch(err => {
-    console.error('Failed to connect to MongoDB:', err);
-});
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => {
+        console.log('Connected to MongoDB');
+    })
+    .catch(err => {
+        console.error('Failed to connect to MongoDB:', err);
+    });
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
@@ -20,14 +22,13 @@ async function getBotProfilePhoto() {
         const botInfo = await bot.telegram.getMe();
         const userId = botInfo.id;
 
-        // Fetch the profile photos from the Telegram API
         const response = await axios.get(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUserProfilePhotos`, {
             params: { user_id: userId, limit: 1 }
         });
 
         const photos = response.data.result.photos;
         if (photos.length > 0) {
-            return photos[0][0].file_id; // Return the file_id of the first photo
+            return photos[0][0].file_id;
         } else {
             throw new Error('No profile photos found');
         }
@@ -37,6 +38,39 @@ async function getBotProfilePhoto() {
     }
 }
 
+// Function to convert bytes to MB
+const bytesToMB = (bytes) => {
+    if (bytes === 0) return '0 MB';
+    const mb = bytes / (1024 * 1024);
+    return mb.toFixed(2) + ' MB';
+};
+
+// Function to generate inline keyboard buttons for a specific page
+const generateButtons = (videos, page, totalPages) => {
+    const maxButtonsPerPage = 8;
+    const startIndex = (page - 1) * maxButtonsPerPage;
+    const endIndex = Math.min(startIndex + maxButtonsPerPage, videos.length);
+
+    const buttons = videos.slice(startIndex, endIndex).map(video => {
+        const sizeMB = bytesToMB(video.size);
+        return [Markup.button.callback(`[${sizeMB}] - ${video.caption}`, `watch_${video._id}`)];
+    });
+
+    // Add navigation buttons if necessary
+    const navigationButtons = [];
+    if (page > 1) {
+        navigationButtons.push(Markup.button.callback('Prev', `prev_${page}`));
+    }
+    if (page < totalPages) {
+        navigationButtons.push(Markup.button.callback('Next', `next_${page}`));
+    }
+    if (navigationButtons.length > 0) {
+        buttons.push(navigationButtons);
+    }
+
+    return buttons;
+};
+
 // Telegram bot handlers
 bot.start(async (ctx) => {
     try {
@@ -45,7 +79,7 @@ bot.start(async (ctx) => {
         const message = await ctx.replyWithPhoto(
             botPhotoFileId,
             {
-                caption: `HELLO ${username}, I AM A MOVIE BOT ADD ME TO YOUR MOVIE CHAT GROUP`,
+                caption: `HELLO ${username}, I AM A MOVIE BOT. ADD ME TO YOUR MOVIE CHAT GROUP.`,
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
                     [Markup.button.url('+ Add me to your group +', 'http://t.me/movie_cast_bot?startgroup=true')],
@@ -57,11 +91,10 @@ bot.start(async (ctx) => {
             }
         );
 
-        // Schedule the deletion of the message after 2 minutes
         setTimeout(() => {
             ctx.deleteMessage(message.message_id)
                 .catch(err => console.error('Error deleting message:', err));
-        }, 2 * 60 * 1000); // 2 minutes in milliseconds
+        }, 2 * 60 * 1000);
 
     } catch (err) {
         console.error('Error sending start message:', err);
@@ -69,48 +102,77 @@ bot.start(async (ctx) => {
     }
 });
 
-// Handle incoming videos
-bot.on('video', async (ctx) => {
+// Handle text messages (movie name search)
+bot.on("text", async (ctx) => {
+    const movieName = ctx.message.text.trim();
+
     try {
-        const video = ctx.message.video;
-        const caption = ctx.message.caption ? ctx.message.caption.replace(/@\S+/g, '').replace(/http\S+/g, '') : '';
-
-        // Check if video already exists in MongoDB
-        const existingVideo = await Video.findOne({
-            $or: [
-                { videoId: new RegExp(video.file_id, 'i') },
-                {
-                    $and: [
-                        { caption: new RegExp(caption, 'i') },
-                        { size: video.file_size }
-                    ]
-                }
-            ]
-        });
-
-        if (existingVideo) {
-            await ctx.reply('This video already exists in the database.');
+        if (!movieName) {
+            ctx.reply("Please enter a valid movie name.");
             return;
         }
 
-        // Save video details to MongoDB
-        const newVideo = new Video({
-            videoId: video.file_id,
-            caption: caption,
-            size: video.file_size
-        });
-        await newVideo.save();
+        const regex = new RegExp(movieName, "i");
+        const matchingVideos = await Video.find({ caption: regex });
+
+        if (matchingVideos.length === 0) {
+            ctx.reply(`No movie found with matching name '${movieName}'.`);
+            return;
+        }
+
+        const totalPages = Math.ceil(matchingVideos.length / 8);
+        let currentPage = 1;
+        const buttons = generateButtons(matchingVideos, currentPage, totalPages);
 
         await ctx.reply(
-            'Video received!',
-            Markup.inlineKeyboard([
-                [Markup.button.url(caption, `https://telegram.me/movie_cast_bot?start=files_${video.file_id}`)],
-            ])
+            `Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
+            Markup.inlineKeyboard(buttons)
         );
-    } catch (err) {
-        console.error('Error processing video:', err);
-        ctx.reply('Failed to process video.');
+
+    } catch (error) {
+        console.error("Error searching for videos:", error);
+        ctx.reply("Failed to search for videos. Please try again later.");
     }
+});
+
+// Handle next page action
+bot.action(/next_(\d+)/, async (ctx) => {
+    const currentPage = parseInt(ctx.match[1]);
+    const nextPage = currentPage + 1;
+
+    const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
+    const regex = new RegExp(movieName, "i");
+    const matchingVideos = await Video.find({ caption: regex });
+    const totalPages = Math.ceil(matchingVideos.length / 8);
+
+    if (nextPage <= totalPages) {
+        const buttons = generateButtons(matchingVideos, nextPage, totalPages);
+        await ctx.editMessageText(
+            `Page ${nextPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
+            Markup.inlineKeyboard(buttons)
+        );
+    }
+    await ctx.answerCbQuery();
+});
+
+// Handle previous page action
+bot.action(/prev_(\d+)/, async (ctx) => {
+    const currentPage = parseInt(ctx.match[1]);
+    const prevPage = currentPage - 1;
+
+    const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
+    const regex = new RegExp(movieName, "i");
+    const matchingVideos = await Video.find({ caption: regex });
+    const totalPages = Math.ceil(matchingVideos.length / 8);
+
+    if (prevPage > 0) {
+        const buttons = generateButtons(matchingVideos, prevPage, totalPages);
+        await ctx.editMessageText(
+            `Page ${prevPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
+            Markup.inlineKeyboard(buttons)
+        );
+    }
+    await ctx.answerCbQuery();
 });
 
 // Catch Telegraf errors
