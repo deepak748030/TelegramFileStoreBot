@@ -12,6 +12,7 @@ async function getBotProfilePhoto() {
         const userId = botInfo.id;
 
         // Fetch the profile photos from the Telegram API
+        console.log(`api request`)
         const response = await axios.get(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getUserProfilePhotos`, {
             params: { user_id: userId, limit: 1 }
         });
@@ -31,8 +32,10 @@ async function getBotProfilePhoto() {
 // Telegram bot handlers
 bot.start(async (ctx) => {
     try {
+        console.log(`start`)
         const username = ctx.from.first_name || 'user';
         const botPhotoFileId = await getBotProfilePhoto();
+        console.log(`reply`)
         const message = await ctx.replyWithPhoto(
             botPhotoFileId,
             {
