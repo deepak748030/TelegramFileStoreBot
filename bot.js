@@ -9,7 +9,7 @@ let dbConnection;
 const connectToMongoDB = async () => {
     if (!dbConnection) {
         try {
-            dbConnection = await mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+            dbConnection = await mongoose.connect(process.env.MONGODB_URI);
             console.log('Connected to MongoDB');
         } catch (err) {
             console.error('Failed to connect to MongoDB:', err);
@@ -139,7 +139,6 @@ bot.command("moviecounts", async (ctx) => {
         deleteMessageAfter(ctx, sentMessage.message_id, 120);
     }
 });
-
 bot.on("text", async (ctx) => {
     const movieName = ctx.message.text.trim();
     const username = ctx.from.first_name || ctx.from.username || 'user';
@@ -152,14 +151,17 @@ bot.on("text", async (ctx) => {
 
         // Clean movieName for search: case insensitive, gap insensitive, character insensitive, and bracket insensitive
         const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
-        const regexText = cleanMovieName.replace(/\s+/g, '\\s+').replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 
-        // Adjust regex pattern to handle flexible search queries
-        const searchKeywords = regexText.split(/\s+/).filter(keyword => keyword.length > 1).join('|');
-        const regex = new RegExp(`(${searchKeywords})`, "gi");
+        // Implement fuzzy search and ranking for better results
+        const fuzzyRegex = new RegExp(cleanMovieName.split('').join('.{0,2}?'), 'i');
 
-        // Find matching videos with more relevance to less relevance
-        const matchingVideos = await Video.find({ caption: regex }).sort({ caption: -1 });
+        // Full-text search with $text (MongoDB supports text indexes)
+        const matchingVideos = await Video.find({
+            $or: [
+                { caption: { $regex: fuzzyRegex } },
+                { $text: { $search: cleanMovieName } }
+            ]
+        }).sort({ score: { $meta: "textScore" } });
 
         if (matchingVideos.length === 0) {
             ctx.reply(`No movie found with matching name '${movieName}'.`, { reply_to_message_id: ctx.message.message_id });
@@ -189,6 +191,7 @@ bot.on("text", async (ctx) => {
         deleteMessageAfter(ctx, sentMessage.message_id, 120);
     }
 });
+
 
 // Handle next page action
 bot.action(/next_(\d+)/, async (ctx) => {
