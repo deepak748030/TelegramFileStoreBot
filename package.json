@@ -1,22 +1,22 @@
 {
-  "name": "your-project",
+  "name": "tele_bot",
   "version": "1.0.0",
-  "description": "A Telegram bot for movie management.",
-  "main": "server.js",
+  "description": "A Telegram bot using Telegraf and Express, deployable on Vercel",
+  "main": "node index.js",
   "scripts": {
     "start": "node server.js",
     "set-webhook": "node setWebhook.js"
   },
-  "dependencies": {
-    "axios": "^0.21.1",
-    "dotenv": "^8.2.0",
-    "express": "^4.17.1",
-    "mongoose": "^5.11.15",
-    "telegraf": "^3.38.0"
-  },
-  "engines": {
-    "node": "14.x"
-  },
   "author": "Your Name",
-  "license": "MIT"
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "body-parser": "^1.20.2",
+    "bull": "^4.13.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.4.1",
+    "telegraf": "^4.16.3"
+  }
 }
