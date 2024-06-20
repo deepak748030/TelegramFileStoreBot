@@ -1,18 +1,24 @@
 const { Telegraf, Markup } = require('telegraf');
-const axios = require('axios');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const { Video } = require('./models/video'); // Assuming you have a Video model
 dotenv.config();
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
-        console.log('Connected to MongoDB');
-    })
-    .catch(err => {
-        console.error('Failed to connect to MongoDB:', err);
-    });
+let dbConnection;
+
+const connectToMongoDB = async () => {
+    if (!dbConnection) {
+        try {
+            dbConnection = await mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+            console.log('Connected to MongoDB');
+        } catch (err) {
+            console.error('Failed to connect to MongoDB:', err);
+        }
+    }
+    return dbConnection;
+};
+
+connectToMongoDB(); // Ensure the connection is established when the bot is initialized
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
