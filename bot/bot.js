@@ -1,7 +1,8 @@
 const { Telegraf, Markup } = require('telegraf');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
-const { Video } = require('./models/video'); // Assuming you have a Video model
+const { Video } = require('../models/video'); // Adjust the path if necessary
+
 dotenv.config();
 
 let dbConnection;
