@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const bot = require('./bot/bot'); // Adjust the path if necessary
+const bot = require('../bot'); // Adjust the path if necessary
 
 dotenv.config();
 
@@ -30,8 +30,6 @@ app.use((err, req, res, next) => {
 
 // Ensure MongoDB connection is established once
 let dbConnection;
-
-//update
 
 const connectToMongoDB = async () => {
     if (!dbConnection) {
