@@ -51,10 +51,10 @@ const generateButtons = (videos, page, totalPages) => {
     // Add navigation buttons if necessary
     const navigationButtons = [];
     if (page > 1) {
-        navigationButtons.push(Markup.button.callback('Prev', `prev_${page}`));
+        navigationButtons.push(Markup.button.callback('Prev 🢢', `prev_${page}`));
     }
     if (page < totalPages) {
-        navigationButtons.push(Markup.button.callback('Next', `next_${page}`));
+        navigationButtons.push(Markup.button.callback('Next 🢣', `next_${page}`));
     }
     if (navigationButtons.length > 0) {
         buttons.push(navigationButtons);
@@ -150,19 +150,15 @@ bot.on("text", async (ctx) => {
             return;
         }
 
-        // Clean movieName for search: case insensitive, gap insensitive, character insensitive, and bracket insensitive
+        // Create a case-insensitive, gap insensitive regex pattern
         const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
-        const regexText = cleanMovieName.replace(/\s+/g, '\\s+').replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+        const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join('');
+        const regex = new RegExp(`${searchPattern}`, 'i');
 
-        // Adjust regex pattern to handle flexible search queries
-        const searchKeywords = regexText.split(/\s+/).filter(keyword => keyword.length > 1).join('|');
-        const regex = new RegExp(`(${searchKeywords})`, "gi");
-
-        // Find matching videos with more relevance to less relevance
-        const matchingVideos = await Video.find({ caption: regex }).sort({ caption: -1 });
+        // Find matching videos with case-insensitive regex
+        const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ caption: -1 });
 
         if (matchingVideos.length === 0) {
-            ctx.reply(`No movie found with matching name '${movieName}'.`, { reply_to_message_id: ctx.message.message_id });
             return;
         }
 
@@ -171,7 +167,7 @@ bot.on("text", async (ctx) => {
         const buttons = generateButtons(matchingVideos, currentPage, totalPages);
 
         const sentMessage = await ctx.reply(
-            `@${username}, found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
+            `@${username}, found 📖${matchingVideos.length}📖 videos matching '${movieName}'. Select one to watch:`,
             {
                 reply_to_message_id: ctx.message.message_id,
                 ...Markup.inlineKeyboard(buttons)
@@ -258,7 +254,6 @@ const cleanCaption = (caption) => {
         .trim();
 };
 
-// Handle video messages with captions
 bot.on("video", async (ctx) => {
     const { message } = ctx.update;
 
@@ -269,27 +264,29 @@ bot.on("video", async (ctx) => {
             const videoFileId = message.video.file_id;
             const videoSize = message.video.file_size;
 
-            const existingVideo = await Video.findOne({ $or: [{ fileId: videoFileId }, { caption: caption }] });
+            // Check if the video already exists based on fileId, caption, and fileSize
+            const existingVideo = await Video.findOne({
+                fileId: videoFileId,
+                caption: caption,
+                size: videoSize
+            });
+
             if (existingVideo) {
-                if (ctx?.from?.username == 'knox7489' || ctx?.from?.username == 'deepak74893') {
-                    await ctx.reply("Video already exists in the database.");
+                if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
+                    // await ctx.reply("Video already exists in the database.");
+                    throw new Error("Video already exists in the database.");
                 }
-                throw new Error("Video already exists in the database.");
+                return;
             }
 
             // Store video data in MongoDB
             await storeVideoData(videoFileId, caption, videoSize);
 
-            // Modify caption with channel link if not present
-            if (!/@[A-Za-z0-9_]+/g.test(caption)) {
-                caption += "\n\nJoin ➥ @moviecastback";
-            }
-            if (ctx?.from?.username == 'knox7489' || ctx?.from?.username == 'deepak74893') {
+            if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
                 await ctx.reply("Video uploaded successfully.");
             }
-            console.log(`Video uploaded`);
-            // Notify specific users of successful upload
 
+            console.log(`Video uploaded`);
 
             // Delete the message after 2 minutes
             deleteMessageAfter(ctx, message.message_id, 120);
@@ -297,15 +294,10 @@ bot.on("video", async (ctx) => {
 
     } catch (error) {
         console.error("Error forwarding video with modified caption:", error);
-        if (error.message === "Video already exists in the database.") {
-            if (!['knox', 'deepak74893'].includes(ctx.from.username)) {
-                ctx.reply("This video has already been uploaded.");
-            }
-        } else {
-            ctx.reply(`Failed to upload video: ${error.message}`);
-        }
+        ctx.reply(`Failed to upload video: ${error.message}`);
     }
 });
+
 
 
 
