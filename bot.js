@@ -22,6 +22,7 @@ connectToMongoDB(); // Ensure the connection is established when the bot is init
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
+
 // Function to convert bytes to MB
 const bytesToMB = (bytes) => {
     if (bytes === 0) return '0 MB';
@@ -66,13 +67,16 @@ const generateButtons = (videos, page, totalPages) => {
 const deleteMessageAfter = (ctx, messageId, seconds) => {
     setTimeout(async () => {
         try {
-            await ctx.telegram.deleteMessage(ctx.chat.id, messageId);
+            if (ctx.message && ctx.message.chat) {
+                await ctx.telegram.deleteMessage(ctx.message.chat.id, messageId);
+            } else {
+                console.warn('Message or chat is undefined. Cannot delete message.');
+            }
         } catch (error) {
             console.error('Error deleting message:', error);
         }
     }, seconds * 1000); // Convert seconds to milliseconds
 };
-
 // Handle /start command with specific video ID
 bot.start(async (ctx) => {
     const callbackData = ctx.update.message.text;
@@ -82,7 +86,7 @@ bot.start(async (ctx) => {
         try {
             const video = await Video.findById(videoId);
             if (!video) {
-                await ctx.reply(`Video with ID '${videoId}' not found.`);
+                ctx.reply(`Video with ID '${videoId}' not found.`);
                 return;
             }
 
@@ -103,10 +107,10 @@ bot.start(async (ctx) => {
 
         } catch (error) {
             console.error(`Error fetching video with ID '${videoId}':`, error);
-            await ctx.reply(`Failed to fetch video. Please try again later.`);
+            ctx.reply(`Failed to fetch video. Please try again later.`);
         }
     } else {
-        const sentMessage = await ctx.reply("Welcome to Movie Cast Bot!", {
+        await ctx.reply("Welcome to Movie Cast Bot!", {
             reply_markup: Markup.inlineKeyboard([
                 [
                     Markup.button.url('Go to Website', 'https://yourwebsite.com'),
@@ -116,7 +120,7 @@ bot.start(async (ctx) => {
         });
 
         // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+        deleteMessageAfter(ctx, ctx.message.message_id, 120);
     }
 });
 
@@ -138,72 +142,24 @@ bot.command("moviecounts", async (ctx) => {
     }
 });
 
-bot.on("video", async (ctx) => {
-    const { message } = ctx.update;
 
+// Telegram bot handlers
+bot.command("moviecounts", async (ctx) => {
     try {
-        if (message.caption) {
-            let caption = cleanCaption(message.caption);
+        const count = await Video.countDocuments();
+        const sentMessage = await ctx.reply(`Total movies in the database: ${count}`);
 
-            const videoFileId = message.video.file_id;
-            const videoSize = message.video.file_size;
-
-            // Check if the video already exists based on fileId, caption, and fileSize
-            const existingVideo = await Video.findOne({
-                fileId: videoFileId,
-                caption: caption,
-                size: videoSize
-            });
-
-            if (existingVideo) {
-                if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
-                    // await ctx.reply("Video already exists in the database.");
-                    throw new Error("Video already exists in the database.");
-                }
-                return;
-            }
-
-            // Store video data in MongoDB
-            await storeVideoData(videoFileId, caption, videoSize);
-
-            if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
-                await ctx.reply("Video uploaded successfully.");
-            }
-
-            console.log(`Video uploaded`);
-
-            // Delete the message after 2 minutes
-            deleteMessageAfter(ctx, message.message_id, 120);
-        }
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
 
     } catch (error) {
-        console.error("Error forwarding video with modified caption:", error);
+        console.error("Error fetching movie count:", error);
+        const sentMessage = await ctx.reply("Failed to fetch movie count. Please try again later.");
 
-        await ctx.reply(`Failed to upload video: ${error.message}`);
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
     }
 });
-
-// Function to store video data in MongoDB
-const storeVideoData = async (fileId, caption, size) => {
-    const video = new Video({
-        fileId: fileId,
-        caption: caption,
-        size: size
-    });
-    await video.save();
-};
-
-// Function to clean the caption by removing unwanted elements
-const cleanCaption = (caption) => {
-    // Remove links, special characters, stickers, emojis, extra spaces, and mentions except "@moviecastback"
-    return caption
-        .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "") // Remove URLs
-        .replace(/[^\w\s@.]/g, "") // Remove special characters except "@" and "."
-        .replace(/\./g, " ") // Replace dots with a single space
-        .replace(/\s\s+/g, " ") // Replace multiple spaces with a single space
-        .replace(/@[A-Za-z0-9_]+/g, "@moviecastback") // Replace all mentions with "@moviecastback"
-        .trim();
-};
 
 bot.on("text", async (ctx) => {
     const movieName = ctx.message.text.trim();
@@ -211,7 +167,7 @@ bot.on("text", async (ctx) => {
 
     try {
         if (!movieName) {
-            await ctx.reply("Please enter a valid movie name.", { reply_to_message_id: ctx.message.message_id });
+            ctx.reply("Please enter a valid movie name.", { reply_to_message_id: ctx.message.message_id });
             return;
         }
 
@@ -244,47 +200,129 @@ bot.on("text", async (ctx) => {
 
     } catch (error) {
         console.error("Error searching for videos:", error);
-
-        const sentMessage = await ctx.reply(`An error occurred while searching for videos: ${error.message}`);
+        const sentMessage = await ctx.reply("Failed to search for videos. Please try again later.", { reply_to_message_id: ctx.message.message_id });
 
         // Delete the message after 2 minutes
         deleteMessageAfter(ctx, sentMessage.message_id, 120);
     }
 });
 
+// Handle next page action
 bot.action(/next_(\d+)/, async (ctx) => {
-    const nextPage = parseInt(ctx.match[1], 10) + 1;
-    await handlePagination(ctx, nextPage);
+    const currentPage = parseInt(ctx.match[1]);
+    const nextPage = currentPage + 1;
+
+    const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
+    const regex = new RegExp(movieName, "i");
+    const matchingVideos = await Video.find({ caption: regex });
+    const totalPages = Math.ceil(matchingVideos.length / 8);
+
+    if (nextPage <= totalPages) {
+        const buttons = generateButtons(matchingVideos, nextPage, totalPages);
+        const sentMessage = await ctx.editMessageText(
+            `Page ${nextPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
+            Markup.inlineKeyboard(buttons)
+        );
+
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+    }
+    await ctx.answerCbQuery();
 });
 
+// Handle previous page action
 bot.action(/prev_(\d+)/, async (ctx) => {
-    const prevPage = parseInt(ctx.match[1], 10) - 1;
-    await handlePagination(ctx, prevPage);
+    const currentPage = parseInt(ctx.match[1]);
+    const prevPage = currentPage - 1;
+
+    const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
+    const regex = new RegExp(movieName, "i");
+    const matchingVideos = await Video.find({ caption: regex });
+    const totalPages = Math.ceil(matchingVideos.length / 8);
+
+    if (prevPage > 0) {
+        const buttons = generateButtons(matchingVideos, prevPage, totalPages);
+        const sentMessage = await ctx.editMessageText(
+            `Page ${prevPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
+            Markup.inlineKeyboard(buttons)
+        );
+
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+    }
+    await ctx.answerCbQuery();
 });
 
-const handlePagination = async (ctx, page) => {
+// Function to store video data in MongoDB
+const storeVideoData = async (fileId, caption, size) => {
+    const video = new Video({
+        fileId: fileId,
+        caption: caption,
+        size: size
+    });
+    await video.save();
+};
+
+// Function to clean the caption by removing unwanted elements
+const cleanCaption = (caption) => {
+    // Remove links, special characters, stickers, emojis, extra spaces, and mentions except "@moviecastback"
+    return caption
+        .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "") // Remove URLs
+        .replace(/[^\w\s@.]/g, "") // Remove special characters except "@" and "."
+        .replace(/\./g, " ") // Replace dots with a single space
+        .replace(/\s\s+/g, " ") // Replace multiple spaces with a single space
+        .replace(/@[A-Za-z0-9_]+/g, "@moviecastback") // Replace all mentions with "@moviecastback"
+        .trim();
+};
+
+bot.on("video", async (ctx) => {
+    const { message } = ctx.update;
+
     try {
-        const callbackData = ctx.update.callback_query.message.text;
-        const movieName = callbackData.split("'")[1]; // Extract movie name from the callback data
+        if (message.caption) {
+            let caption = cleanCaption(message.caption);
 
-        const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
-        const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join('');
-        const regex = new RegExp(`${searchPattern}`, 'i');
+            const videoFileId = message.video.file_id;
+            const videoSize = message.video.file_size;
 
-        const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ caption: -1 });
+            // Check if the video already exists based on fileId, caption, and fileSize
+            const existingVideo = await Video.findOne({
+                fileId: videoFileId,
+                caption: caption,
+                size: videoSize
+            });
 
-        const totalPages = Math.ceil(matchingVideos.length / 8);
+            if (existingVideo) {
+                if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
+                    // await ctx.reply("Video already exists in the database.");
+                    throw new Error("Video already exists in the database.");
+                }
+                return;
+            }
 
-        const buttons = generateButtons(matchingVideos, page, totalPages);
+            // Store video data in MongoDB
+            await storeVideoData(videoFileId, caption, videoSize);
 
-        await ctx.editMessageReplyMarkup(Markup.inlineKeyboard(buttons));
+
+            if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
+                await ctx.reply("Video uploaded successfully.");
+            }
+
+            console.log(`Video uploaded`);
+
+            // Delete the message after 2 minutes
+            deleteMessageAfter(ctx, message.message_id, 120);
+        }
 
     } catch (error) {
-        console.error("Error handling pagination:", error);
+        console.error("Error forwarding video with modified caption:", error);
 
-        await ctx.reply(`An error occurred while handling pagination: ${error.message}`);
+        ctx.reply(`Failed to upload video: ${error.message}`);
     }
-};
+});
+
+
+
 
 // Catch Telegraf errors
 bot.catch((err, ctx) => {
