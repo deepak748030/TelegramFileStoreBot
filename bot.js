@@ -22,7 +22,6 @@ connectToMongoDB(); // Ensure the connection is established when the bot is init
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
-
 // Function to convert bytes to MB
 const bytesToMB = (bytes) => {
     if (bytes === 0) return '0 MB';
@@ -67,11 +66,7 @@ const generateButtons = (videos, page, totalPages) => {
 const deleteMessageAfter = (ctx, messageId, seconds) => {
     setTimeout(async () => {
         try {
-            if (ctx.message && ctx.message.chat) {
-                await ctx.telegram.deleteMessage(ctx.message.chat.id, messageId);
-            } else {
-                console.warn('Message or chat is undefined. Cannot delete message.');
-            }
+            await ctx.telegram.deleteMessage(ctx.chat.id, messageId);
         } catch (error) {
             console.error('Error deleting message:', error);
         }
@@ -87,13 +82,16 @@ bot.start(async (ctx) => {
         try {
             const video = await Video.findById(videoId);
             if (!video) {
-                ctx.reply(`Video with ID '${videoId}' not found.`);
+                await ctx.reply(`Video with ID '${videoId}' not found.`);
                 return;
             }
 
+            // Add "Join ➥ @moviecastback" to the end of the caption
+            const captionWithLink = `${video.caption}\n\nJoin ➥ @moviecastback`;
+
             // Send the video file to the user
             const sentMessage = await ctx.replyWithVideo(video.fileId, {
-                caption: video.caption,
+                caption: captionWithLink,
                 parse_mode: 'HTML',
                 reply_markup: Markup.inlineKeyboard([
                     Markup.button.url('Watch Movie', `https://t.me/movie_cast_bot?start=watch_${videoId}`)
@@ -105,10 +103,10 @@ bot.start(async (ctx) => {
 
         } catch (error) {
             console.error(`Error fetching video with ID '${videoId}':`, error);
-            ctx.reply(`Failed to fetch video. Please try again later.`);
+            await ctx.reply(`Failed to fetch video. Please try again later.`);
         }
     } else {
-        await ctx.reply("Welcome to Movie Cast Bot!", {
+        const sentMessage = await ctx.reply("Welcome to Movie Cast Bot!", {
             reply_markup: Markup.inlineKeyboard([
                 [
                     Markup.button.url('Go to Website', 'https://yourwebsite.com'),
@@ -118,7 +116,7 @@ bot.start(async (ctx) => {
         });
 
         // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, ctx.message.message_id, 120);
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
     }
 });
 
@@ -139,120 +137,6 @@ bot.command("moviecounts", async (ctx) => {
         deleteMessageAfter(ctx, sentMessage.message_id, 120);
     }
 });
-
-bot.on("text", async (ctx) => {
-    const movieName = ctx.message.text.trim();
-    const username = ctx.from.first_name || ctx.from.username || 'user';
-
-    try {
-        if (!movieName) {
-            ctx.reply("Please enter a valid movie name.", { reply_to_message_id: ctx.message.message_id });
-            return;
-        }
-
-        // Create a case-insensitive, gap insensitive regex pattern
-        const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
-        const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join('');
-        const regex = new RegExp(`${searchPattern}`, 'i');
-
-        // Find matching videos with case-insensitive regex
-        const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ caption: -1 });
-
-        if (matchingVideos.length === 0) {
-            return;
-        }
-
-        const totalPages = Math.ceil(matchingVideos.length / 8);
-        let currentPage = 1;
-        const buttons = generateButtons(matchingVideos, currentPage, totalPages);
-
-        const sentMessage = await ctx.reply(
-            `@${username}, found 📖${matchingVideos.length}📖 videos matching '${movieName}'. Select one to watch:`,
-            {
-                reply_to_message_id: ctx.message.message_id,
-                ...Markup.inlineKeyboard(buttons)
-            }
-        );
-
-        // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
-
-    } catch (error) {
-        console.error("Error searching for videos:", error);
-        const sentMessage = await ctx.reply("Failed to search for videos. Please try again later.", { reply_to_message_id: ctx.message.message_id });
-
-        // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
-    }
-});
-
-// Handle next page action
-bot.action(/next_(\d+)/, async (ctx) => {
-    const currentPage = parseInt(ctx.match[1]);
-    const nextPage = currentPage + 1;
-
-    const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
-    const regex = new RegExp(movieName, "i");
-    const matchingVideos = await Video.find({ caption: regex });
-    const totalPages = Math.ceil(matchingVideos.length / 8);
-
-    if (nextPage <= totalPages) {
-        const buttons = generateButtons(matchingVideos, nextPage, totalPages);
-        const sentMessage = await ctx.editMessageText(
-            `Page ${nextPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
-            Markup.inlineKeyboard(buttons)
-        );
-
-        // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
-    }
-    await ctx.answerCbQuery();
-});
-
-// Handle previous page action
-bot.action(/prev_(\d+)/, async (ctx) => {
-    const currentPage = parseInt(ctx.match[1]);
-    const prevPage = currentPage - 1;
-
-    const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
-    const regex = new RegExp(movieName, "i");
-    const matchingVideos = await Video.find({ caption: regex });
-    const totalPages = Math.ceil(matchingVideos.length / 8);
-
-    if (prevPage > 0) {
-        const buttons = generateButtons(matchingVideos, prevPage, totalPages);
-        const sentMessage = await ctx.editMessageText(
-            `Page ${prevPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
-            Markup.inlineKeyboard(buttons)
-        );
-
-        // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
-    }
-    await ctx.answerCbQuery();
-});
-
-// Function to store video data in MongoDB
-const storeVideoData = async (fileId, caption, size) => {
-    const video = new Video({
-        fileId: fileId,
-        caption: caption,
-        size: size
-    });
-    await video.save();
-};
-
-// Function to clean the caption by removing unwanted elements
-const cleanCaption = (caption) => {
-    // Remove links, special characters, stickers, emojis, extra spaces, and mentions except "@moviecastback"
-    return caption
-        .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "") // Remove URLs
-        .replace(/[^\w\s@.]/g, "") // Remove special characters except "@" and "."
-        .replace(/\./g, " ") // Replace dots with a single space
-        .replace(/\s\s+/g, " ") // Replace multiple spaces with a single space
-        .replace(/@[A-Za-z0-9_]+/g, "@moviecastback") // Replace all mentions with "@moviecastback"
-        .trim();
-};
 
 bot.on("video", async (ctx) => {
     const { message } = ctx.update;
@@ -294,12 +178,113 @@ bot.on("video", async (ctx) => {
 
     } catch (error) {
         console.error("Error forwarding video with modified caption:", error);
-        ctx.reply(`Failed to upload video: ${error.message}`);
+
+        await ctx.reply(`Failed to upload video: ${error.message}`);
     }
 });
 
+// Function to store video data in MongoDB
+const storeVideoData = async (fileId, caption, size) => {
+    const video = new Video({
+        fileId: fileId,
+        caption: caption,
+        size: size
+    });
+    await video.save();
+};
 
+// Function to clean the caption by removing unwanted elements
+const cleanCaption = (caption) => {
+    // Remove links, special characters, stickers, emojis, extra spaces, and mentions except "@moviecastback"
+    return caption
+        .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "") // Remove URLs
+        .replace(/[^\w\s@.]/g, "") // Remove special characters except "@" and "."
+        .replace(/\./g, " ") // Replace dots with a single space
+        .replace(/\s\s+/g, " ") // Replace multiple spaces with a single space
+        .replace(/@[A-Za-z0-9_]+/g, "@moviecastback") // Replace all mentions with "@moviecastback"
+        .trim();
+};
 
+bot.on("text", async (ctx) => {
+    const movieName = ctx.message.text.trim();
+    const username = ctx.from.first_name || ctx.from.username || 'user';
+
+    try {
+        if (!movieName) {
+            await ctx.reply("Please enter a valid movie name.", { reply_to_message_id: ctx.message.message_id });
+            return;
+        }
+
+        // Create a case-insensitive, gap insensitive regex pattern
+        const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
+        const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join('');
+        const regex = new RegExp(`${searchPattern}`, 'i');
+
+        // Find matching videos with case-insensitive regex
+        const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ caption: -1 });
+
+        if (matchingVideos.length === 0) {
+            return;
+        }
+
+        const totalPages = Math.ceil(matchingVideos.length / 8);
+        let currentPage = 1;
+        const buttons = generateButtons(matchingVideos, currentPage, totalPages);
+
+        const sentMessage = await ctx.reply(
+            `@${username}, found 📖${matchingVideos.length}📖 videos matching '${movieName}'. Select one to watch:`,
+            {
+                reply_to_message_id: ctx.message.message_id,
+                ...Markup.inlineKeyboard(buttons)
+            }
+        );
+
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+
+    } catch (error) {
+        console.error("Error searching for videos:", error);
+
+        const sentMessage = await ctx.reply(`An error occurred while searching for videos: ${error.message}`);
+
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+    }
+});
+
+bot.action(/next_(\d+)/, async (ctx) => {
+    const nextPage = parseInt(ctx.match[1], 10) + 1;
+    await handlePagination(ctx, nextPage);
+});
+
+bot.action(/prev_(\d+)/, async (ctx) => {
+    const prevPage = parseInt(ctx.match[1], 10) - 1;
+    await handlePagination(ctx, prevPage);
+});
+
+const handlePagination = async (ctx, page) => {
+    try {
+        const callbackData = ctx.update.callback_query.message.text;
+        const movieName = callbackData.split("'")[1]; // Extract movie name from the callback data
+
+        const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
+        const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join('');
+        const regex = new RegExp(`${searchPattern}`, 'i');
+
+        const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ caption: -1 });
+
+        const totalPages = Math.ceil(matchingVideos.length / 8);
+
+        const buttons = generateButtons(matchingVideos, page, totalPages);
+
+        await ctx.editMessageReplyMarkup(Markup.inlineKeyboard(buttons));
+
+    } catch (error) {
+        console.error("Error handling pagination:", error);
+
+        await ctx.reply(`An error occurred while handling pagination: ${error.message}`);
+    }
+};
 
 // Catch Telegraf errors
 bot.catch((err, ctx) => {
