@@ -293,9 +293,8 @@ bot.on("video", async (ctx) => {
 
             if (existingVideo) {
                 if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
-                    await ctx.reply("Video already exists in the database.");
+                    throw new Error("Video already exists in the database.");
                 }
-                throw new Error("Video already exists in the database.");
             }
 
             // Store video data in MongoDB
@@ -314,7 +313,6 @@ bot.on("video", async (ctx) => {
 
     } catch (error) {
         console.error("Error forwarding video with modified caption:", error);
-
         ctx.reply(`Failed to upload video: ${error.message}`);
     }
 });
