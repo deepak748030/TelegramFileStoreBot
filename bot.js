@@ -287,17 +287,15 @@ bot.on("video", async (ctx) => {
 
             // Check if the video already exists based on fileId, caption, and fileSize
             const existingVideo = await Video.findOne({
-                fileId: videoFileId,
                 caption: caption,
                 size: videoSize
             });
 
             if (existingVideo) {
                 if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
-                    // await ctx.reply("Video already exists in the database.");
-                    throw new Error("Video already exists in the database.");
+                    await ctx.reply("Video already exists in the database.");
                 }
-                return;
+                throw new Error("Video already exists in the database.");
             }
 
             // Store video data in MongoDB
