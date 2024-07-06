@@ -22,6 +22,18 @@ connectToMongoDB(); // Ensure the connection is established when the bot is init
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
 
+const requiredChannel = '@moviecastback'; // The channel that users must join
+
+// Function to check if a user is a member of the required channel
+const isMemberOfChannel = async (userId) => {
+    try {
+        const chatMember = await bot.telegram.getChatMember(requiredChannel, userId);
+        return ['member', 'administrator', 'creator'].includes(chatMember.status);
+    } catch (error) {
+        console.error('Error checking membership status:', error);
+        return false;
+    }
+};
 
 // Function to convert bytes to MB
 const bytesToMB = (bytes) => {
@@ -81,9 +93,15 @@ const deleteMessageAfter = (ctx, messageId, seconds) => {
 bot.start(async (ctx) => {
     const callbackData = ctx.update.message.text;
     if (callbackData.startsWith('/start watch_')) {
-        const videoId = callbackData.split('_')[1]; // Extract video ID from the callback data
+        const videoId = callbackData.split('_')[2]; // Extract video ID from the callback data
 
         try {
+            const isMember = await isMemberOfChannel(ctx.from.id);
+            if (!isMember) {
+                await ctx.reply(`Please join ${requiredChannel} to access the video.`);
+                return;
+            }
+
             const video = await Video.findById(videoId);
             if (!video) {
                 ctx.reply(`Video with ID '${videoId}' not found.`);
@@ -142,7 +160,6 @@ bot.command("moviecounts", async (ctx) => {
     }
 });
 
-
 // Telegram bot handlers
 bot.command("moviecounts", async (ctx) => {
     try {
@@ -171,8 +188,11 @@ bot.on("text", async (ctx) => {
             return;
         }
 
+        // Remove common terms like "movies" and "webseries" from the search query
+        const cleanedMovieName = movieName.replace(/(?:movies?|webseries?)/gi, '').trim();
+
         // Create a case-insensitive, gap insensitive regex pattern
-        const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
+        const cleanMovieName = cleanedMovieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
         const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join('');
         const regex = new RegExp(`${searchPattern}`, 'i');
 
@@ -219,13 +239,7 @@ bot.action(/next_(\d+)/, async (ctx) => {
 
     if (nextPage <= totalPages) {
         const buttons = generateButtons(matchingVideos, nextPage, totalPages);
-        const sentMessage = await ctx.editMessageText(
-            `Page ${nextPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
-            Markup.inlineKeyboard(buttons)
-        );
-
-        // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+        await ctx.editMessageReplyMarkup(Markup.inlineKeyboard(buttons));
     }
     await ctx.answerCbQuery();
 });
@@ -240,90 +254,12 @@ bot.action(/prev_(\d+)/, async (ctx) => {
     const matchingVideos = await Video.find({ caption: regex });
     const totalPages = Math.ceil(matchingVideos.length / 8);
 
-    if (prevPage > 0) {
+    if (prevPage >= 1) {
         const buttons = generateButtons(matchingVideos, prevPage, totalPages);
-        const sentMessage = await ctx.editMessageText(
-            `Page ${prevPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
-            Markup.inlineKeyboard(buttons)
-        );
-
-        // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+        await ctx.editMessageReplyMarkup(Markup.inlineKeyboard(buttons));
     }
     await ctx.answerCbQuery();
 });
 
-// Function to store video data in MongoDB
-const storeVideoData = async (fileId, caption, size) => {
-    const video = new Video({
-        fileId: fileId,
-        caption: caption,
-        size: size
-    });
-    await video.save();
-};
-
-// Function to clean the caption by removing unwanted elements
-const cleanCaption = (caption) => {
-    // Remove links, special characters, stickers, emojis, extra spaces, and mentions except "@moviecastback"
-    return caption
-        .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "") // Remove URLs
-        .replace(/[^\w\s@.]/g, "") // Remove special characters except "@" and "."
-        .replace(/\./g, " ") // Replace dots with a single space
-        .replace(/\s\s+/g, " ") // Replace multiple spaces with a single space
-        .replace(/@[A-Za-z0-9_]+/g, "@moviecastback") // Replace all mentions with "@moviecastback"
-        .trim();
-};
-
-bot.on("video", async (ctx) => {
-    const { message } = ctx.update;
-
-    try {
-        if (message.caption) {
-            let caption = cleanCaption(message.caption);
-
-            const videoFileId = message.video.file_id;
-            const videoSize = message.video.file_size;
-
-            // Check if the video already exists based on fileId, caption, and fileSize
-            const existingVideo = await Video.findOne({
-                caption: caption,
-                size: videoSize
-            });
-
-            if (existingVideo) {
-                if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
-                    throw new Error("Video already exists in the database.");
-                }
-            }
-
-            // Store video data in MongoDB
-            await storeVideoData(videoFileId, caption, videoSize);
-
-
-            if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
-                await ctx.reply("Video uploaded successfully.");
-            }
-
-            console.log(`Video uploaded`);
-
-            // Delete the message after 2 minutes
-            deleteMessageAfter(ctx, message.message_id, 120);
-        }
-
-    } catch (error) {
-        console.error("Error forwarding video with modified caption:", error);
-        ctx.reply(`Failed to upload video: ${error.message}`);
-    }
-});
-
-
-
-
-// Catch Telegraf errors
-bot.catch((err, ctx) => {
-    console.error('Telegraf error:', err);
-    ctx.reply('Oops! Something went wrong.');
-});
-
-module.exports = bot;
+bot.launch();
+console.log('Bot is running...');
