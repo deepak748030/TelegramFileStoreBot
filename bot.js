@@ -82,8 +82,6 @@ const deleteMessageAfter = (ctx, messageId, seconds) => {
 // Handle /start command with specific video ID
 bot.start(async (ctx) => {
     const callbackData = ctx.update.message.text;
-    const botImageUrl = 'https://yourwebsite.com/path/to/bot_image.jpg'; // Replace with your bot image URL
-
     if (callbackData.startsWith('/start watch_')) {
         const videoId = callbackData.split('_')[1]; // Extract video ID from the callback data
 
@@ -118,10 +116,6 @@ bot.start(async (ctx) => {
             ctx.reply(`Failed to fetch video. Please try again later.`);
         }
     } else {
-        // First send the bot image
-        await ctx.replyWithPhoto(botImageUrl, { caption: 'Welcome to Movie Cast Bot!', parse_mode: 'HTML' });
-
-        // Then send the welcome message
         await ctx.reply("Welcome to Movie Cast Bot!", {
             reply_markup: {
                 inline_keyboard: [
@@ -137,7 +131,6 @@ bot.start(async (ctx) => {
         deleteMessageAfter(ctx, ctx.message.message_id, 120);
     }
 });
-
 
 
 // Telegram bot handlers
