@@ -9,7 +9,7 @@ let dbConnection;
 const connectToMongoDB = async () => {
     if (!dbConnection) {
         try {
-            dbConnection = await mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+            dbConnection = await mongoose.connect(process.env.MONGODB_URI);
             console.log('Connected to MongoDB');
         } catch (err) {
             console.error('Failed to connect to MongoDB:', err);
@@ -77,6 +77,7 @@ const deleteMessageAfter = (ctx, messageId, seconds) => {
         }
     }, seconds * 1000); // Convert seconds to milliseconds
 };
+
 // Handle /start command with specific video ID
 bot.start(async (ctx) => {
     const callbackData = ctx.update.message.text;
@@ -97,9 +98,13 @@ bot.start(async (ctx) => {
             const sentMessage = await ctx.replyWithVideo(video.fileId, {
                 caption: captionWithLink,
                 parse_mode: 'HTML',
-                reply_markup: Markup.inlineKeyboard([
-                    Markup.button.url('Watch Movie', `https://t.me/movie_cast_bot?start=watch_${videoId}`)
-                ])
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: 'Watch Movie', url: `https://t.me/movie_cast_bot?start=watch_${videoId}` }
+                        ]
+                    ]
+                }
             });
 
             // Delete the message after 2 minutes
@@ -111,18 +116,21 @@ bot.start(async (ctx) => {
         }
     } else {
         await ctx.reply("Welcome to Movie Cast Bot!", {
-            reply_markup: Markup.inlineKeyboard([
-                [
-                    Markup.button.url('Go to Website', 'https://yourwebsite.com'),
-                    Markup.button.callback('View Movies', 'view_movies')
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        { text: 'Go to Website', url: 'https://yourwebsite.com' },
+                        { text: 'View Movies', callback_data: 'view_movies' }
+                    ]
                 ]
-            ])
+            }
         });
 
         // Delete the message after 2 minutes
         deleteMessageAfter(ctx, ctx.message.message_id, 120);
     }
 });
+
 
 // Telegram bot handlers
 bot.command("moviecounts", async (ctx) => {
