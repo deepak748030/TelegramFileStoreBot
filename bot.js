@@ -78,35 +78,14 @@ const deleteMessageAfter = (ctx, messageId, seconds) => {
     }, seconds * 1000); // Convert seconds to milliseconds
 };
 
-// Import axios or node-fetch to make HTTP requests if needed
-const axios = require('axios');
 
 // Handle /start command with specific video ID
 bot.start(async (ctx) => {
     const callbackData = ctx.update.message.text;
-    const userId = ctx.from.id; // Get user ID
-    const channelUsername = '@moviecastback'; // The channel they need to join
-
     if (callbackData.startsWith('/start watch_')) {
         const videoId = callbackData.split('_')[1]; // Extract video ID from the callback data
 
         try {
-            // Check if the user is a member of the channel
-            const memberStatus = await bot.telegram.getChatMember(channelUsername, userId);
-
-            // If user is not in the channel, prompt them to join
-            if (memberStatus.status === 'left' || memberStatus.status === 'kicked') {
-                await ctx.reply('You need to join our channel to access this video. Please join and try again.', {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: 'Join MovieCastBack Channel', url: 'https://t.me/moviecastback' }]
-                        ]
-                    }
-                });
-                return;
-            }
-
-            // If the user is already in the channel, proceed with sending the video
             const video = await Video.findById(videoId);
             if (!video) {
                 ctx.reply(`Video with ID '${videoId}' not found.`);
@@ -152,7 +131,6 @@ bot.start(async (ctx) => {
         deleteMessageAfter(ctx, ctx.message.message_id, 120);
     }
 });
-
 
 
 // Telegram bot handlers
