@@ -422,26 +422,27 @@ bot.on("video", async (ctx) => {
 
         // Use caption if available, otherwise fall back to videoFileId
         const captionRaw = message.caption ? message.caption : videoFileId;
-        const captionAi = await getChatCompletion(`
-        ${captionRaw} 
-        
-        Create a visually appealing video caption using the following format:
-        - Only the movie/series name, no extra words or symbols in this dont use emoji or sticker also.\n
-        - ⭐ Rating: Include stars and IMDb rating.
-        - 🎭 Genre: Specify the category/genre.
-        - 🔢 Size: ${bytesToMB(videoSize)} MB.
-        - ⏱️ Duration: Include the duration.
-        - 🎬 S0/EP write after this: write episode   and season also if it is series .
-        - 🗂️ Quality: Specify the video quality.
-        - 🗣️ Language: Mention the language.
-        - 📁 Format: Specify the file format. \n
-        - 🎬 Plot Summary: Keep it concise.
-        
-        Use proper spacing, fancy icons, and a clean, visually appealing design. Do not add any extra words or unnecessary details.
-        `);
+        // const captionAi = await getChatCompletion(`
+        // ${captionRaw} 
 
-        const caption = captionAi.replace(/\*/g, "");
-        console.log(caption);
+        // Create a visually appealing video caption using the following format:
+        // - Only the movie/series name, no extra words or symbols in this dont use emoji or sticker also.\n
+        // - ⭐ Rating: Include stars and IMDb rating.
+        // - 🎭 Genre: Specify the category/genre.
+        // - 🔢 Size: ${bytesToMB(videoSize)} MB.
+        // - ⏱️ Duration: Include the duration.
+        // - 🎬 S0/EP write after this: write episode   and season also if it is series .
+        // - 🗂️ Quality: Specify the video quality.
+        // - 🗣️ Language: Mention the language.
+        // - 📁 Format: Specify the file format. \n
+        // - 🎬 Plot Summary: Keep it concise.
+
+        // Use proper spacing, fancy icons, and a clean, visually appealing design. Do not add any extra words or unnecessary details.
+        // `);
+
+        // const caption = captionAi.replace(/\*/g, "");
+        const caption = captionRaw;
+
         const existingVideo = await Video.findOne({
             caption: caption,
             size: videoSize,
