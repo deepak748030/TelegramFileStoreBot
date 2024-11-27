@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const { Video } = require('./models/video'); // Assuming you have a Video model
 dotenv.config();
+const { getChatCompletion } = require('./api/api-services');
 
 let dbConnection;
 
@@ -284,45 +285,81 @@ const cleanCaption = (caption) => {
         .trim();
 };
 
+
 bot.on("video", async (ctx) => {
     const { message } = ctx.update;
-
+    console.log(message)
     try {
-        if (message.caption) {
-            let caption = cleanCaption(message.caption);
-
-            const videoFileId = message.video.file_id;
-            const videoSize = message.video.file_size;
-
-            // Check if the video already exists based on fileId, caption, and fileSize
-            const existingVideo = await Video.findOne({
-                caption: caption,
-                size: videoSize
-            });
-
-            if (existingVideo) {
-                if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
-                    throw new Error("Video already exists in the database.");
-                }
-            }
-
-            // Store video data in MongoDB
-            await storeVideoData(videoFileId, caption, videoSize);
-
-
-            if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
-                await ctx.reply("Video uploaded successfully.");
-            }
-
-            console.log(`Video uploaded`);
-
-            // Delete the message after 2 minutes
-            deleteMessageAfter(ctx, message.message_id, 120);
+        if (!allowedUsers.includes(ctx.from.username)) {
+            await ctx.reply("❌ You are not authorized to upload videos.");
+            return;
         }
 
+        // Extract video details
+        const videoFileId = message.video.file_id;
+        const videoSize = message.video.file_size;
+
+        // Use caption if available, otherwise fall back to videoFileId
+        const captionRaw = message.caption ? message.caption : videoFileId;
+        const captionAi = await getChatCompletion(`
+        ${captionRaw} 
+        
+        Create a visually appealing video caption using the following format:
+        - Only the movie/series name, no extra words or symbols in this dont use emoji or sticker also.\n
+        - ⭐ Rating: Include stars and IMDb rating.
+        - 🎭 Genre: Specify the category/genre.
+        - 🔢 Size: ${bytesToMB(videoSize)} MB.
+        - ⏱️ Duration: Include the duration.
+        - 🎬 S0/EP write after this: write episode   and season also if it is series .
+        - 🗂️ Quality: Specify the video quality.
+        - 🗣️ Language: Mention the language.
+        - 📁 Format: Specify the file format. \n
+        - 🎬 Plot Summary: Keep it concise.
+        
+        Use proper spacing, fancy icons, and a clean, visually appealing design. Do not add any extra words or unnecessary details.
+        `);
+
+        const caption = captionAi.replace(/\*/g, "");
+        const existingVideo = await Video.findOne({
+            caption: caption,
+            size: videoSize,
+        });
+
+        if (existingVideo) {
+            throw new Error("This video already exists in the database.");
+        }
+
+        // Store video data in MongoDB
+        const videos = await storeVideoData(videoFileId, caption, videoSize);
+
+        // Send success message for admin users
+        await ctx.reply("🎉 Video uploaded successfully.");
+
+        // Generate and share the video link
+        const videoLink = `https://t.me/${process.env.BOT_USERNAME}?start=watch_${videos._id}`;
+        await ctx.reply(
+            `🎥 <b>Video Uploaded Successfully</b> ✅\n\n` +
+            `🔗 <b>Watch it here:</b> <a href="${videoLink}">${videoLink}</a>`,
+            { parse_mode: "HTML" }
+        );
+
+        // Auto-delete the message after 2 minutes
+        deleteMessageAfter(ctx, message.message_id, 120);
+
+        // Check if there are more videos to process
+        const nextVideo = ctx.message.reply_to_message;
+        if (nextVideo && nextVideo.video) {
+            await bot.handleUpdate({ message: nextVideo });
+        }
     } catch (error) {
-        console.error("Error forwarding video with modified caption:", error);
-        ctx.reply(`Failed to upload video: ${error.message}`);
+        console.error("Error uploading video:", error);
+
+        // Handle errors gracefully with a user-friendly message
+        await ctx.reply(
+            `⚠️ <b>Failed to Upload Video</b> ❌\n\n` +
+            `Reason: ${error.message}`,
+            { parse_mode: "HTML" }
+        );
     }
 });
 
