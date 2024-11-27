@@ -290,6 +290,8 @@ bot.on("video", async (ctx) => {
     const { message } = ctx.update;
     console.log(message)
     try {
+        const allowedUsers = ["knox7489", "vixcasm", "Knoxbros"];
+
         if (!allowedUsers.includes(ctx.from.username)) {
             await ctx.reply("❌ You are not authorized to upload videos.");
             return;
