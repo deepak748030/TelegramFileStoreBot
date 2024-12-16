@@ -2,7 +2,6 @@ const { Telegraf, Markup } = require('telegraf');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const { Video } = require('./models/video'); // Assuming you have a Video model
-const ai = require('unlimited-ai');
 dotenv.config();
 
 let dbConnection;
@@ -22,6 +21,7 @@ const connectToMongoDB = async () => {
 connectToMongoDB(); // Ensure the connection is established when the bot is initialized
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
+
 
 // Function to convert bytes to MB
 const bytesToMB = (bytes) => {
@@ -78,59 +78,6 @@ const deleteMessageAfter = (ctx, messageId, seconds) => {
     }, seconds * 1000); // Convert seconds to milliseconds
 };
 
-const updateCaptions = async (ctx) => {
-    await connectToMongoDB();
-
-    // Fetch all videos from the database
-    const videos = await Video.find();
-
-    let updateCount = 0;
-    for (const video of videos) {
-        const prompt = `
-            ${video.caption}
-
-            Create a visually appealing video caption using the following format:
-            - Only the movie/series name, no extra words or symbols.
-           <b> Demon Slayer: Kimetsu no Yaiba - To the Hashira Training (2024) </b>
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━  
-    <b> Language:</b> |   <b> Quality:</b>  |  <b> Format:</b>  |<b> Codec:</b>  |  S|  <b>File Type:</b>
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-            Use proper spacing, fancy icons, and a clean, visually appealing design. Do not add any extra words or unnecessary details.
-        `;
-
-        const model = 'gpt-4-turbo-2024-04-09';
-        const messages = [
-            { role: 'user', content: prompt },
-            { role: 'system', content: 'You are a movie/series data provider website.' }
-        ];
-
-        try {
-            // Generate new caption using AI
-            const newCaption = await ai.generate(model, messages);
-
-            // Update the video document with the new caption
-            if (newCaption && typeof newCaption === 'string' && newCaption.trim().length > 0) {
-                await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
-                updateCount++;
-                await ctx.reply(`Updated caption for video ID ${video._id}: ${newCaption}`, {
-                    parse_mode: 'HTML'
-                });
-            } else {
-                await ctx.reply(`No valid caption generated for video ID ${video._id}`, {
-                    parse_mode: 'HTML'
-                });
-            }
-        } catch (aiError) {
-            console.error(`Error generating caption for video ID ${video._id}:`, aiError);
-            await ctx.reply(`Error generating caption for video ID ${video._id}`, {
-                parse_mode: 'HTML'
-            });
-        }
-    }
-
-    await ctx.reply(`Total captions updated: ${updateCount}`);
-};
 
 // Handle /start command with specific video ID
 bot.start(async (ctx) => {
@@ -185,6 +132,7 @@ bot.start(async (ctx) => {
     }
 });
 
+
 // Telegram bot handlers
 bot.command("moviecounts", async (ctx) => {
     try {
@@ -203,11 +151,6 @@ bot.command("moviecounts", async (ctx) => {
     }
 });
 
-bot.command("update", async (ctx) => {
-
-    await ctx.reply("Starting caption update process...");
-    await updateCaptions(ctx);
-});
 
 // Telegram bot handlers
 bot.command("moviecounts", async (ctx) => {
@@ -243,46 +186,147 @@ bot.on("text", async (ctx) => {
         const regex = new RegExp(`${searchPattern}`, 'i');
 
         // Find matching videos with case-insensitive regex
-        const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ updatedAt: -1 }).exec();
+        const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ caption: -1 });
 
         if (matchingVideos.length === 0) {
-            ctx.reply(`No videos found for "${movieName}"`, { reply_to_message_id: ctx.message.message_id });
             return;
         }
 
         const totalPages = Math.ceil(matchingVideos.length / 8);
         let currentPage = 1;
-        let message = await ctx.reply("Here are the results:", {
-            reply_markup: {
-                inline_keyboard: generateButtons(matchingVideos, currentPage, totalPages)
-            }
-        });
+        const buttons = generateButtons(matchingVideos, currentPage, totalPages);
 
-        // Handle pagination
-        bot.action(/prev_(\d+)/, async (ctx) => {
-            const page = parseInt(ctx.match[1]);
-            if (page > 1) {
-                currentPage = page - 1;
-                await ctx.editMessageReplyMarkup({
-                    inline_keyboard: generateButtons(matchingVideos, currentPage, totalPages)
-                });
+        const sentMessage = await ctx.reply(
+            `@${username}, found 📖${matchingVideos.length}📖 videos matching '${movieName}'. Select one to watch:`,
+            {
+                reply_to_message_id: ctx.message.message_id,
+                ...Markup.inlineKeyboard(buttons)
             }
-        });
+        );
 
-        bot.action(/next_(\d+)/, async (ctx) => {
-            const page = parseInt(ctx.match[1]);
-            if (page < totalPages) {
-                currentPage = page + 1;
-                await ctx.editMessageReplyMarkup({
-                    inline_keyboard: generateButtons(matchingVideos, currentPage, totalPages)
-                });
-            }
-        });
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+
     } catch (error) {
-        console.error('Error fetching videos:', error);
-        ctx.reply("An error occurred. Please try again later.", { reply_to_message_id: ctx.message.message_id });
+        console.error("Error searching for videos:", error);
+        const sentMessage = await ctx.reply("Failed to search for videos. Please try again later.", { reply_to_message_id: ctx.message.message_id });
+
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
     }
 });
+
+// Handle next page action
+bot.action(/next_(\d+)/, async (ctx) => {
+    const currentPage = parseInt(ctx.match[1]);
+    const nextPage = currentPage + 1;
+
+    const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
+    const regex = new RegExp(movieName, "i");
+    const matchingVideos = await Video.find({ caption: regex });
+    const totalPages = Math.ceil(matchingVideos.length / 8);
+
+    if (nextPage <= totalPages) {
+        const buttons = generateButtons(matchingVideos, nextPage, totalPages);
+        const sentMessage = await ctx.editMessageText(
+            `Page ${nextPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
+            Markup.inlineKeyboard(buttons)
+        );
+
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+    }
+    await ctx.answerCbQuery();
+});
+
+// Handle previous page action
+bot.action(/prev_(\d+)/, async (ctx) => {
+    const currentPage = parseInt(ctx.match[1]);
+    const prevPage = currentPage - 1;
+
+    const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
+    const regex = new RegExp(movieName, "i");
+    const matchingVideos = await Video.find({ caption: regex });
+    const totalPages = Math.ceil(matchingVideos.length / 8);
+
+    if (prevPage > 0) {
+        const buttons = generateButtons(matchingVideos, prevPage, totalPages);
+        const sentMessage = await ctx.editMessageText(
+            `Page ${prevPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
+            Markup.inlineKeyboard(buttons)
+        );
+
+        // Delete the message after 2 minutes
+        deleteMessageAfter(ctx, sentMessage.message_id, 120);
+    }
+    await ctx.answerCbQuery();
+});
+
+// Function to store video data in MongoDB
+const storeVideoData = async (fileId, caption, size) => {
+    const video = new Video({
+        fileId: fileId,
+        caption: caption,
+        size: size
+    });
+    await video.save();
+};
+
+// Function to clean the caption by removing unwanted elements
+const cleanCaption = (caption) => {
+    // Remove links, special characters, stickers, emojis, extra spaces, and mentions except "@moviecastback"
+    return caption
+        .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "") // Remove URLs
+        .replace(/[^\w\s@.]/g, "") // Remove special characters except "@" and "."
+        .replace(/\./g, " ") // Replace dots with a single space
+        .replace(/\s\s+/g, " ") // Replace multiple spaces with a single space
+        .replace(/@[A-Za-z0-9_]+/g, "@moviecastback") // Replace all mentions with "@moviecastback"
+        .trim();
+};
+
+bot.on("video", async (ctx) => {
+    const { message } = ctx.update;
+
+    try {
+        if (message.caption) {
+            let caption = cleanCaption(message.caption);
+
+            const videoFileId = message.video.file_id;
+            const videoSize = message.video.file_size;
+
+            // Check if the video already exists based on fileId, caption, and fileSize
+            const existingVideo = await Video.findOne({
+                caption: caption,
+                size: videoSize
+            });
+
+            if (existingVideo) {
+                if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
+                    throw new Error("Video already exists in the database.");
+                }
+            }
+
+            // Store video data in MongoDB
+            await storeVideoData(videoFileId, caption, videoSize);
+
+
+            if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
+                await ctx.reply("Video uploaded successfully.");
+            }
+
+            console.log(`Video uploaded`);
+
+            // Delete the message after 2 minutes
+            deleteMessageAfter(ctx, message.message_id, 120);
+        }
+
+    } catch (error) {
+        console.error("Error forwarding video with modified caption:", error);
+        ctx.reply(`Failed to upload video: ${error.message}`);
+    }
+});
+
+
 
 
 // Catch Telegraf errors
