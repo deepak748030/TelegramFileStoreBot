@@ -209,7 +209,37 @@ bot.command("update", async (ctx) => {
     await ctx.reply(`Caption update process completed. Total captions updated: ${updateCount} out of ${totalVideos}.`);
 });
 
+// /Ai command to generate text based on user input
+bot.command("Ai", async (ctx) => {
+  const userInput = ctx.message.text.replace("/Ai", "").trim(); // Remove "/Ai" and get user input
 
+  if (!userInput) {
+    await ctx.reply("Please provide some text after the command.");
+    return;
+  }
+
+  await ctx.reply("Generating response... Please wait.");
+
+  const model = "gpt-4-turbo";
+  const messages = [
+    { role: "system", content: "You are an AI assistant providing text responses based on user input." },
+    { role: "user", content: userInput },
+  ];
+
+  try {
+    const response = await ai.generate(model, messages);
+    const generatedText = response?.trim();
+
+    if (!generatedText) {
+      await ctx.reply("Sorry, no valid response generated.");
+    } else {
+      await ctx.reply(`AI Response: \n${generatedText}`);
+    }
+  } catch (error) {
+    console.error("Error generating AI response:", error);
+    await ctx.reply("An error occurred while processing your request.");
+  }
+});
 // Telegram bot handlers
 bot.command("moviecounts", async (ctx) => {
     try {
