@@ -222,7 +222,7 @@ bot.command("ai", async (ctx) => {
   const model = "gpt-4-turbo-2024-04-09";
   const messages = [
     { role: "system", content: "You are an AI assistant providing text responses based on user input." },
-    { role: "user", content: `${userInput} send in fency with sticker format and proper arrange` },
+    { role: "user", content: `${userInput} <b></b> use these instead of starts and use these to send in telegram we are making this for telegram ai bot` },
   ];
 
   try {
