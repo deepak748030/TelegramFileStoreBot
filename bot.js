@@ -240,7 +240,7 @@ bot.command("ai", async (ctx) => {
     }
   } catch (error) {
     console.error("Error generating AI response:", error);
-    await ctx.reply("An error occurred",error);
+    await ctx.reply("An error occurred");
   }
 });
 
