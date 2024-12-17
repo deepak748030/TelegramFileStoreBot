@@ -228,7 +228,7 @@ bot.command("ai", async (ctx) => {
 
   try {
     const response = await ai.generate(model, messages);
-       await ctx.reply(`AI Response: \n${response}`);
+       // await ctx.reply(`AI Response: \n${response}`);
     const generatedText = response;
 
     if (!generatedText) {
