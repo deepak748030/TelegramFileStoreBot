@@ -227,14 +227,14 @@ bot.command("ai", async (ctx) => {
 
   try {
     const response = await ai.generate(model, messages);
-       // await ctx.reply(`AI Response: \n${response}`);
-    const generatedText = response;
+    const generatedText = response.trim();
 
     if (!generatedText) {
       await ctx.reply("Sorry, no valid response generated.");
     } else {
       await ctx.reply(`AI Response: \n${generatedText}`);
-  deleteMessageAfter(ctx, sentMessage.message_id,3);
+      // Delete the "Generating response..." message after the AI response is sent
+      deleteMessageAfter(ctx, sentMessage.message_id, 3);  // 3 seconds delay
     }
   } catch (error) {
     console.error("Error generating AI response:", error);
