@@ -227,7 +227,7 @@ bot.command("ai", async (ctx) => {
 
   try {
       const sentMessage = await ctx.reply("Generating response... Please wait.");
-      deleteMessageAfter(ctx, sentMessage.message_id, 3);
+      
     const response = await ai.generate(model, messages);
     const generatedText = response;
 
@@ -236,7 +236,7 @@ bot.command("ai", async (ctx) => {
     } else {
       await ctx.reply(`AI Response: \n${generatedText}`);
       // Delete the "Generating response..." message after the AI response is sent
-        // 3 seconds delay
+      deleteMessageAfter(ctx, sentMessage.message_id, 3);  // 3 seconds delay
     }
   } catch (error) {
     console.error("Error generating AI response:", error);
