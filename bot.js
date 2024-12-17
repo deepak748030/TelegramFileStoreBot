@@ -77,60 +77,7 @@ const deleteMessageAfter = (ctx, messageId, seconds) => {
     }, seconds * 1000); // Convert seconds to milliseconds
 };
 
-const updateCaptions = async (ctx) => {
-    await connectToMongoDB();
 
-    // Fetch all videos from the database
-    const videos = await Video.find();
-
-    let updateCount = 0;
-    for (const video of videos) {
-        const prompt = `
-            ${video.caption}
-
-            Create a visually appealing video caption using the following format:
-            - Only the movie/series name, no extra words or symbols.
-           <b> Demon Slayer: Kimetsu no Yaiba - To the Hashira Training (2024) </b>
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━  
-    <b> Language:</b> |   <b> Quality:</b>  |  <b> Format:</b>  |<b> Codec:</b>  |  S|  <b>File Type:</b>
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-            Use proper spacing, fancy icons, and a clean, visually appealing design. Do not add any extra words or unnecessary details.
-        `;
-
-        const model = 'gpt-4-turbo-2024-04-09';
-        const messages = [
-            { role: 'user', content: prompt },
-            { role: 'system', content: 'You are a movie/series data provider website.' }
-        ];
-
-        try {
-            // Generate new caption using AI
-            const newCaption = await ai.generate(model, messages);
-
-            // Update the video document with the new caption
-            if (newCaption && typeof newCaption === 'string' && newCaption.trim().length > 0) {
-                await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
-                updateCount++;
-                await ctx.reply(`Updated caption for video ID ${video._id}: ${newCaption}`, {
-                    parse_mode: 'HTML'
-                });
-                console.log(newCaption);
-            } else {
-                await ctx.reply(`No valid caption generated for video ID ${video._id}`, {
-                    parse_mode: 'HTML'
-                });
-            }
-        } catch (aiError) {
-            console.error(`Error generating caption for video ID ${video._id}:`, aiError);
-            await ctx.reply(`Error generating caption for video ID ${video._id}`, {
-                parse_mode: 'HTML'
-            });
-        }
-    }
-
-    await ctx.reply(`Total captions updated: ${updateCount}`);
-};
 
 // Handle /start command with specific video ID
 bot.start(async (ctx) => {
@@ -204,14 +151,21 @@ bot.command("moviecounts", async (ctx) => {
 });
 
 bot.command("update", async (ctx) => {
-
     await ctx.reply("Starting caption update process...");
     await connectToMongoDB();
 
-    // Fetch all videos from the database
-    // const videos = await Video.find();
+    const videos = await Video.find();
+    const totalVideos = videos.length;
+
+    if (totalVideos === 0) {
+        await ctx.reply("No videos found to update.");
+        return;
+    }
 
     let updateCount = 0;
+    const progressInterval = Math.max(1, Math.floor(totalVideos * 0.0001)); // 0.01% threshold
+
+    // Process videos
     for (const video of videos) {
         const prompt = `
             ${video.caption}
@@ -223,38 +177,38 @@ bot.command("update", async (ctx) => {
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━   
         `;
 
-        const model = 'gpt-4-turbo-2024-04-09';
+        const model = 'gpt-4-turbo';
         const messages = [
-            { role: 'user', content: prompt },
-            { role: 'system', content: 'You are a movie/series data provider website.' }
+            { role: 'system', content: 'You are a movie/series data provider website.' },
+            { role: 'user', content: prompt }
         ];
 
         try {
+            await ctx.reply(`Genearting caption Wait`);
             // Generate new caption using AI
-            // const newCaption = await ai.generate(model, messages);
+            const response = await ai.generate(model, messages);
+            const newCaption = response;
+            await ctx.reply(newCaption);
+            if (newCaption && newCaption.length > 0) {
+                await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
+                updateCount++;
 
-            // // Update the video document with the new caption
-            // if (newCaption && typeof newCaption === 'string' && newCaption.trim().length > 0) {
-            //     await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
-            //     updateCount++;
-            //     await ctx.reply(`Updated caption for video ID ${video._id}: ${newCaption}`, {
-            //         parse_mode: 'HTML'
-            //     });
-            // } else {
-            //     await ctx.reply(`No valid caption generated for video ID ${video._id}`, {
-            //         parse_mode: 'HTML'
-            //     });
-            // }
+                // Send progress update every 0.01%
+                if (updateCount % progressInterval === 0) {
+                    await ctx.reply(`Progress: ${((updateCount / totalVideos) * 100).toFixed(2)}% (${updateCount}/${totalVideos} captions updated).`);
+                }
+            }
         } catch (aiError) {
             console.error(`Error generating caption for video ID ${video._id}:`, aiError);
-            await ctx.reply(`Error generating caption for video ID ${video._id}`, {
-                parse_mode: 'HTML'
-            });
         }
+
+        // Rate limit delay
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second per video
     }
 
-    await ctx.reply(`Total captions updated: ${updateCount}`);
+    await ctx.reply(`Caption update process completed. Total captions updated: ${updateCount} out of ${totalVideos}.`);
 });
+
 
 // Telegram bot handlers
 bot.command("moviecounts", async (ctx) => {
