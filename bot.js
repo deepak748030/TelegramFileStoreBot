@@ -177,7 +177,7 @@ bot.command("update", async (ctx) => {
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━   
         `;
 
-        const model = 'gpt-4-turbo';
+        const model = 'gpt-4-turbo-2024-04-09';
         const messages = [
             { role: 'system', content: 'You are a movie/series data provider website.' },
             { role: 'user', content: prompt }
@@ -220,7 +220,7 @@ bot.command("Ai", async (ctx) => {
 
   await ctx.reply("Generating response... Please wait.");
 
-  const model = "gpt-4-turbo";
+  const model = "gpt-4-turbo-2024-04-09";
   const messages = [
     { role: "system", content: "You are an AI assistant providing text responses based on user input." },
     { role: "user", content: userInput },
@@ -228,7 +228,7 @@ bot.command("Ai", async (ctx) => {
 
   try {
     const response = await ai.generate(model, messages);
-    const generatedText = response?.trim();
+    const generatedText = response;
 
     if (!generatedText) {
       await ctx.reply("Sorry, no valid response generated.");
