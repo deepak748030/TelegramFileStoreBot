@@ -209,7 +209,7 @@ bot.command("update", async (ctx) => {
     await connectToMongoDB();
 
     // Fetch all videos from the database
-    const videos = await Video.find();
+    // const videos = await Video.find();
 
     let updateCount = 0;
     for (const video of videos) {
@@ -231,20 +231,20 @@ bot.command("update", async (ctx) => {
 
         try {
             // Generate new caption using AI
-            const newCaption = await ai.generate(model, messages);
+            // const newCaption = await ai.generate(model, messages);
 
-            // Update the video document with the new caption
-            if (newCaption && typeof newCaption === 'string' && newCaption.trim().length > 0) {
-                await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
-                updateCount++;
-                await ctx.reply(`Updated caption for video ID ${video._id}: ${newCaption}`, {
-                    parse_mode: 'HTML'
-                });
-            } else {
-                await ctx.reply(`No valid caption generated for video ID ${video._id}`, {
-                    parse_mode: 'HTML'
-                });
-            }
+            // // Update the video document with the new caption
+            // if (newCaption && typeof newCaption === 'string' && newCaption.trim().length > 0) {
+            //     await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
+            //     updateCount++;
+            //     await ctx.reply(`Updated caption for video ID ${video._id}: ${newCaption}`, {
+            //         parse_mode: 'HTML'
+            //     });
+            // } else {
+            //     await ctx.reply(`No valid caption generated for video ID ${video._id}`, {
+            //         parse_mode: 'HTML'
+            //     });
+            // }
         } catch (aiError) {
             console.error(`Error generating caption for video ID ${video._id}:`, aiError);
             await ctx.reply(`Error generating caption for video ID ${video._id}`, {
