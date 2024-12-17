@@ -219,7 +219,7 @@ bot.command("ai", async (ctx) => {
   }
 
   const sentMessage = await ctx.reply("Generating response... Please wait.");
-     deleteMessageAfter(ctx, sentMessage.message_id, 3);  // 3 seconds delay
+   
   const model = "gpt-4-turbo-2024-04-09";
   const messages = [
     { role: "system", content: "You are an AI assistant providing text responses based on user input." },
@@ -233,6 +233,7 @@ bot.command("ai", async (ctx) => {
     if (!generatedText) {
       await ctx.reply("Sorry, no valid response generated.");
     } else {
+          deleteMessageAfter(ctx, sentMessage.message_id, 1);  // 3 seconds delay
       await ctx.reply(`<b>AI Response:</b> \n\n${generatedText}`);
       // Delete the "Generating response..." message after the AI response is sent
      
