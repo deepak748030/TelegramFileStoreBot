@@ -81,6 +81,7 @@ const deleteMessageAfter = (ctx, messageId, seconds) => {
 const updateCaptions = async (ctx) => {
     await connectToMongoDB();
 
+    // Fetch all videos from the database
     const videos = await Video.find();
 
     let updateCount = 0;
@@ -89,10 +90,13 @@ const updateCaptions = async (ctx) => {
             ${video.caption}
 
             Create a visually appealing video caption using the following format:
-            <b>${video.title}</b>  
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-            <b>Language:</b> ${video.language} | <b>Quality:</b> ${video.quality} | <b>Format:</b> ${video.format} | <b>Codec:</b> ${video.codec} | <b>File Type:</b> ${video.fileType}  
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━   
+            - Only the movie/series name, no extra words or symbols.
+           <b> Demon Slayer: Kimetsu no Yaiba - To the Hashira Training (2024) </b>
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━  
+    <b> Language:</b> |   <b> Quality:</b>  |  <b> Format:</b>  |<b> Codec:</b>  |  S|  <b>File Type:</b>
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            Use proper spacing, fancy icons, and a clean, visually appealing design. Do not add any extra words or unnecessary details.
         `;
 
         const model = 'gpt-4-turbo-2024-04-09';
@@ -102,9 +106,11 @@ const updateCaptions = async (ctx) => {
         ];
 
         try {
+            // Generate new caption using AI
             const newCaption = await ai.generate(model, messages);
 
-            if (newCaption) {
+            // Update the video document with the new caption
+            if (newCaption && typeof newCaption === 'string' && newCaption.trim().length > 0) {
                 await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
                 updateCount++;
                 await ctx.reply(`Updated caption for video ID ${video._id}: ${newCaption}`, {
@@ -125,7 +131,6 @@ const updateCaptions = async (ctx) => {
 
     await ctx.reply(`Total captions updated: ${updateCount}`);
 };
-
 
 // Handle /start command with specific video ID
 bot.start(async (ctx) => {
