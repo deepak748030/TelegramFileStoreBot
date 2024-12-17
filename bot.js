@@ -165,46 +165,7 @@ bot.command("update", async (ctx) => {
     let updateCount = 0;
     const progressInterval = Math.max(1, Math.floor(totalVideos * 0.0001)); // 0.01% threshold
 
-    // Process videos
-    for (const video of videos) {
-        const prompt = `
-            ${video.caption}
 
-            Create a visually appealing video caption using the following format:
-            <b>${video.title}</b>  
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-            <b>Language:</b> ${video.language} | <b>Quality:</b> ${video.quality} | <b>Format:</b> ${video.format} | <b>Codec:</b> ${video.codec} | <b>File Type:</b> ${video.fileType}  
-            ━━━━━━━━━━━━━━━━━━━━━━━━━━━   
-        `;
-
-        const model = 'gpt-4-turbo-2024-04-09';
-        const messages = [
-            { role: 'system', content: 'You are a movie/series data provider website.' },
-            { role: 'user', content: prompt }
-        ];
-
-        try {
-            await ctx.reply(`Genearting caption Wait`);
-            // Generate new caption using AI
-            const response = await ai.generate(model, messages);
-            const newCaption = response;
-            await ctx.reply(newCaption);
-            if (newCaption && newCaption.length > 0) {
-                await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
-                updateCount++;
-
-                // Send progress update every 0.01%
-                if (updateCount % progressInterval === 0) {
-                    await ctx.reply(`Progress: ${((updateCount / totalVideos) * 100).toFixed(2)}% (${updateCount}/${totalVideos} captions updated).`);
-                }
-            }
-        } catch (aiError) {
-            console.error(`Error generating caption for video ID ${video._id}:`, aiError);
-        }
-
-        // Rate limit delay
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second per video
-    }
 
     await ctx.reply(`Caption update process completed. Total captions updated: ${updateCount} out of ${totalVideos}.`);
 });
