@@ -116,6 +116,7 @@ const updateCaptions = async (ctx) => {
                 await ctx.reply(`Updated caption for video ID ${video._id}: ${newCaption}`, {
                     parse_mode: 'HTML'
                 });
+                console.log(newCaption);
             } else {
                 await ctx.reply(`No valid caption generated for video ID ${video._id}`, {
                     parse_mode: 'HTML'
