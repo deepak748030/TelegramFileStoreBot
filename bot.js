@@ -212,7 +212,7 @@ bot.command("update", async (ctx) => {
 // /Ai command to generate text based on user input
 bot.command("ai", async (ctx) => {
   const userInput = ctx.message.text.replace("/Ai", "").trim(); // Remove "/Ai" and get user input
-  await ctx.reply(userInput);
+  // await ctx.reply(userInput);
   if (!userInput) {
     await ctx.reply("Please provide some text after the command.");
     return;
