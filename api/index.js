@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 
 // Define routes
-app.get('/api', (req, res) => {
+app.get('/', (req, res) => {
     res.send('Server started');
 });
 
