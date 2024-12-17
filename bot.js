@@ -1,4 +1,5 @@
-const { Telegraf, Markup } = require('telegraf');
+..........
+..const { Telegraf, Markup } = require('telegraf');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const { Video } = require('./models/video'); // Assuming you have a Video model
@@ -18,7 +19,7 @@ const connectToMongoDB = async () => {
     }
     return dbConnection;
 };
-
+....
 connectToMongoDB(); // Ensure the connection is established when the bot is initialized
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
