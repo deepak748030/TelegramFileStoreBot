@@ -218,8 +218,7 @@ bot.command("ai", async (ctx) => {
     return;
   }
 
-  await ctx.reply("Generating response... Please wait.");
-
+  const sentmsg = await ctx.reply("Generating response... Please wait.");
   const model = "gpt-4-turbo-2024-04-09";
   const messages = [
     { role: "system", content: "You are an AI assistant providing text responses based on user input." },
@@ -235,6 +234,7 @@ bot.command("ai", async (ctx) => {
       await ctx.reply("Sorry, no valid response generated.");
     } else {
       await ctx.reply(`AI Response: \n${generatedText}`);
+  deleteMessageAfter(ctx, sentMessage.message_id,3);
     }
   } catch (error) {
     console.error("Error generating AI response:", error);
