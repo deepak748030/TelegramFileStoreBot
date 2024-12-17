@@ -234,7 +234,7 @@ bot.command("ai", async (ctx) => {
       await ctx.reply("Sorry, no valid response generated.");
     } else {
           deleteMessageAfter(ctx, sentMessage.message_id, 1);  // 3 seconds delay
-      await ctx.reply(`<b>AI Response:</b> \n\n${generatedText}`);
+      await ctx.reply(`AI Response: \n\n${generatedText}`);
       // Delete the "Generating response..." message after the AI response is sent
      
     }
