@@ -206,7 +206,57 @@ bot.command("moviecounts", async (ctx) => {
 bot.command("update", async (ctx) => {
 
     await ctx.reply("Starting caption update process...");
-    await updateCaptions(ctx);
+    await connectToMongoDB();
+
+    // Fetch all videos from the database
+    const videos = await Video.find();
+
+    let updateCount = 0;
+    for (const video of videos) {
+        const prompt = `
+            ${video.caption}
+
+            Create a visually appealing video caption using the following format:
+            - Only the movie/series name, no extra words or symbols.
+           <b> Demon Slayer: Kimetsu no Yaiba - To the Hashira Training (2024) </b>
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━  
+    <b> Language:</b> |   <b> Quality:</b>  |  <b> Format:</b>  |<b> Codec:</b>  |  S|  <b>File Type:</b>
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            Use proper spacing, fancy icons, and a clean, visually appealing design. Do not add any extra words or unnecessary details.
+        `;
+
+        const model = 'gpt-4-turbo-2024-04-09';
+        const messages = [
+            { role: 'user', content: prompt },
+            { role: 'system', content: 'You are a movie/series data provider website.' }
+        ];
+
+        try {
+            // Generate new caption using AI
+            const newCaption = await ai.generate(model, messages);
+
+            // Update the video document with the new caption
+            if (newCaption && typeof newCaption === 'string' && newCaption.trim().length > 0) {
+                await Video.findByIdAndUpdate(video._id, { caption: newCaption }, { new: true });
+                updateCount++;
+                await ctx.reply(`Updated caption for video ID ${video._id}: ${newCaption}`, {
+                    parse_mode: 'HTML'
+                });
+            } else {
+                await ctx.reply(`No valid caption generated for video ID ${video._id}`, {
+                    parse_mode: 'HTML'
+                });
+            }
+        } catch (aiError) {
+            console.error(`Error generating caption for video ID ${video._id}:`, aiError);
+            await ctx.reply(`Error generating caption for video ID ${video._id}`, {
+                parse_mode: 'HTML'
+            });
+        }
+    }
+
+    await ctx.reply(`Total captions updated: ${updateCount}`);
 });
 
 // Telegram bot handlers
