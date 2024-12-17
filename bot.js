@@ -218,7 +218,7 @@ bot.command("ai", async (ctx) => {
     return;
   }
 
-  const sentmsg = await ctx.reply("Generating response... Please wait.");
+  const sentMessage = await ctx.reply("Generating response... Please wait.");
   const model = "gpt-4-turbo-2024-04-09";
   const messages = [
     { role: "system", content: "You are an AI assistant providing text responses based on user input." },
