@@ -44,17 +44,17 @@ const generateButtons = (videos, page, totalPages) => {
     const buttons = videos.slice(startIndex, endIndex).map(video => {
         const sizeMB = bytesToMB(video.size);
         const truncatedCaption = truncateText(video.caption, 30); // Truncate the caption to 30 characters
-        const videoLink = https://t.me/movie_cast_bot?start=watch_${video._id};
-        return [Markup.button.url(${sizeMB != 'NaN MB' ? [${sizeMB}] : ''} ${truncatedCaption}, videoLink)];
+        const videoLink = `https://t.me/movie_cast_bot?start=watch_${video._id}`;
+        return [Markup.button.url(`${sizeMB != 'NaN MB' ? `[${sizeMB}]` : ''} ${truncatedCaption}`, videoLink)];
     });
 
     // Add navigation buttons if necessary
     const navigationButtons = [];
     if (page > 1) {
-        navigationButtons.push(Markup.button.callback('Prev 🢢', prev_${page}));
+        navigationButtons.push(Markup.button.callback('Prev 🢢', `prev_${page}`));
     }
     if (page < totalPages) {
-        navigationButtons.push(Markup.button.callback('Next 🢣', next_${page}));
+        navigationButtons.push(Markup.button.callback('Next 🢣', `next_${page}`));
     }
     if (navigationButtons.length > 0) {
         buttons.push(navigationButtons);
@@ -88,12 +88,12 @@ bot.start(async (ctx) => {
         try {
             const video = await Video.findById(videoId);
             if (!video) {
-                ctx.reply(Video with ID '${videoId}' not found.);
+                ctx.reply(`Video with ID '${videoId}' not found.`);
                 return;
             }
 
             // Add "Join ➥ @moviecastback" to the end of the caption
-            const captionWithLink = ${video.caption}\n\nJoin ➥ @moviecastback;
+            const captionWithLink = `${video.caption}\n\nJoin ➥ @moviecastback`;
 
             // Send the video file to the user
             const sentMessage = await ctx.replyWithVideo(video.fileId, {
@@ -102,7 +102,7 @@ bot.start(async (ctx) => {
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: 'Watch Movie', url: https://t.me/movie_cast_bot?start=watch_${videoId} }
+                            { text: 'Watch Movie', url: `https://t.me/movie_cast_bot?start=watch_${videoId}` }
                         ]
                     ]
                 }
@@ -112,8 +112,8 @@ bot.start(async (ctx) => {
             deleteMessageAfter(ctx, sentMessage.message_id, 120);
 
         } catch (error) {
-            console.error(Error fetching video with ID '${videoId}':, error);
-            ctx.reply(Failed to fetch video. Please try again later.);
+            console.error(`Error fetching video with ID '${videoId}':`, error);
+            ctx.reply(`Failed to fetch video. Please try again later.`);
         }
     } else {
         await ctx.reply("Welcome to Movie Cast Bot!", {
@@ -137,7 +137,7 @@ bot.start(async (ctx) => {
 bot.command("moviecounts", async (ctx) => {
     try {
         const count = await Video.countDocuments();
-        const sentMessage = await ctx.reply(Total movies in the database: ${count});
+        const sentMessage = await ctx.reply(`Total movies in the database: ${count}`);
 
         // Delete the message after 2 minutes
         deleteMessageAfter(ctx, sentMessage.message_id, 120);
@@ -156,7 +156,7 @@ bot.command("moviecounts", async (ctx) => {
 bot.command("moviecounts", async (ctx) => {
     try {
         const count = await Video.countDocuments();
-        const sentMessage = await ctx.reply(Total movies in the database: ${count});
+        const sentMessage = await ctx.reply(`Total movies in the database: ${count}`);
 
         // Delete the message after 2 minutes
         deleteMessageAfter(ctx, sentMessage.message_id, 120);
@@ -172,7 +172,7 @@ bot.command("moviecounts", async (ctx) => {
 
 bot.on("text", async (ctx) => {
     const movieName = ctx.message.text.trim();
-    const username = ctx.from.first_name  ctx.from.username  'user';
+    const username = ctx.from.first_name || ctx.from.username || 'user';
 
     try {
         if (!movieName) {
@@ -182,8 +182,8 @@ bot.on("text", async (ctx) => {
 
         // Create a case-insensitive, gap insensitive regex pattern
         const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
-        const searchPattern = cleanMovieName.split(/\s+/).map(word => (?=.*${word})).join('');
-        const regex = new RegExp(${searchPattern}, 'i');
+        const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join('');
+        const regex = new RegExp(`${searchPattern}`, 'i');
 
         // Find matching videos with case-insensitive regex
         const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ caption: -1 });
@@ -197,7 +197,7 @@ bot.on("text", async (ctx) => {
         const buttons = generateButtons(matchingVideos, currentPage, totalPages);
 
         const sentMessage = await ctx.reply(
-            @${username}, found 📖${matchingVideos.length}📖 videos matching '${movieName}'. Select one to watch:,
+            `@${username}, found 📖${matchingVideos.length}📖 videos matching '${movieName}'. Select one to watch:`,
             {
                 reply_to_message_id: ctx.message.message_id,
                 ...Markup.inlineKeyboard(buttons)
@@ -229,7 +229,7 @@ bot.action(/next_(\d+)/, async (ctx) => {
     if (nextPage <= totalPages) {
         const buttons = generateButtons(matchingVideos, nextPage, totalPages);
         const sentMessage = await ctx.editMessageText(
-            Page ${nextPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:,
+            `Page ${nextPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
             Markup.inlineKeyboard(buttons)
         );
 
@@ -252,7 +252,7 @@ bot.action(/prev_(\d+)/, async (ctx) => {
     if (prevPage > 0) {
         const buttons = generateButtons(matchingVideos, prevPage, totalPages);
         const sentMessage = await ctx.editMessageText(
-            Page ${prevPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:,
+            `Page ${prevPage}/${totalPages}: Found ${matchingVideos.length} videos matching '${movieName}'. Select one to watch:`,
             Markup.inlineKeyboard(buttons)
         );
 
@@ -314,7 +314,7 @@ bot.on("video", async (ctx) => {
                 await ctx.reply("Video uploaded successfully.");
             }
 
-            console.log(Video uploaded);
+            console.log(`Video uploaded`);
 
             // Delete the message after 2 minutes
             deleteMessageAfter(ctx, message.message_id, 120);
@@ -322,7 +322,7 @@ bot.on("video", async (ctx) => {
 
     } catch (error) {
         console.error("Error forwarding video with modified caption:", error);
-        ctx.reply(Failed to upload video: ${error.message});
+        ctx.reply(`Failed to upload video: ${error.message}`);
     }
 });
 
