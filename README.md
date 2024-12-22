@@ -26,7 +26,7 @@ Follow these steps to set up the bot locally:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/movie-cast-bot.git
+   git clone https://github.com/deepak748030/TelegramFileStoreBot.git
    cd movie-cast-bot
    ```
 
