@@ -104,21 +104,15 @@ Contributions are welcome! To contribute to this project, follow these steps:
 5. Push to the branch (`git push origin feature-branch`)
 6. Create a pull request
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Contact
 
 For any questions, you can reach out to:
 
-- Telegram: [@yourusername](https://t.me/yourusername)
-- Email: your-email@example.com
+- Telegram: [@yourusername](https://t.me/@movie_cast_bot)
+- Email: deepakkushwah748930@gmail.com
 
 ## Acknowledgements
 
 - [Telegraf](https://github.com/telegraf/telegraf): A modern Telegram Bot API framework for Node.js
 - [Mongoose](https://mongoosejs.com/): MongoDB ODM for Node.js
-```
 
-This `README.md` file provides a clear structure for anyone looking to understand or contribute to your project, and it includes sections such as installation, usage, commands, and more. Make sure to adjust the placeholder values (`yourusername`, `your-email@example.com`, etc.) with your actual details.
