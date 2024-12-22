@@ -1,4 +1,4 @@
-# Movie Cast Telegram Bot
+# TelegramFileStoreBot Movie Cast Telegram Bot
 
 The Movie Cast Telegram Bot allows users to search and watch movies directly within Telegram. It provides a seamless experience by listing videos, supporting search functionality, and enabling video streaming through the Telegram platform. The bot also supports inline keyboard navigation for browsing movies and interacting with users.
 
@@ -27,7 +27,7 @@ Follow these steps to set up the bot locally:
 1. Clone the repository:
    ```bash
    git clone https://github.com/deepak748030/TelegramFileStoreBot.git
-   cd movie-cast-bot
+   cd TelegramFileStoreBot
    ```
 
 2. Install dependencies:
