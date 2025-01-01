@@ -1,8 +1,12 @@
 const { Telegraf, Markup } = require('telegraf');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
+const NodeCache = require('node-cache');
+const Fuse = require('fuse.js');
 const { Video } = require('./models/video'); // Assuming you have a Video model
 dotenv.config();
+
+const cache = new NodeCache({ stdTTL: 600 }); // Cache with a TTL of 10 minutes
 
 let dbConnection;
 
@@ -21,7 +25,6 @@ const connectToMongoDB = async () => {
 connectToMongoDB(); // Ensure the connection is established when the bot is initialized
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
-
 
 // Function to convert bytes to MB
 const bytesToMB = (bytes) => {
@@ -78,7 +81,6 @@ const deleteMessageAfter = (ctx, messageId, seconds) => {
     }, seconds * 1000); // Convert seconds to milliseconds
 };
 
-
 // Handle /start command with specific video ID
 bot.start(async (ctx) => {
     const callbackData = ctx.update.message.text;
@@ -86,7 +88,17 @@ bot.start(async (ctx) => {
         const videoId = callbackData.split('_')[1]; // Extract video ID from the callback data
 
         try {
-            const video = await Video.findById(videoId);
+            const cachedVideo = cache.get(videoId);
+            let video;
+            if (cachedVideo) {
+                video = cachedVideo;
+            } else {
+                video = await Video.findById(videoId);
+                if (video) {
+                    cache.set(videoId, video);
+                }
+            }
+
             if (!video) {
                 ctx.reply(`Video with ID '${videoId}' not found.`);
                 return;
@@ -132,26 +144,6 @@ bot.start(async (ctx) => {
     }
 });
 
-
-// Telegram bot handlers
-bot.command("moviecounts", async (ctx) => {
-    try {
-        const count = await Video.countDocuments();
-        const sentMessage = await ctx.reply(`Total movies in the database: ${count}`);
-
-        // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
-
-    } catch (error) {
-        console.error("Error fetching movie count:", error);
-        const sentMessage = await ctx.reply("Failed to fetch movie count. Please try again later.");
-
-        // Delete the message after 2 minutes
-        deleteMessageAfter(ctx, sentMessage.message_id, 120);
-    }
-});
-
-
 // Telegram bot handlers
 bot.command("moviecounts", async (ctx) => {
     try {
@@ -180,13 +172,17 @@ bot.on("text", async (ctx) => {
             return;
         }
 
-        // Create a case-insensitive, gap insensitive regex pattern
-        const cleanMovieName = movieName.replace(/[^\w\s]/gi, '').replace(/\s\s+/g, ' ').trim();
-        const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join('');
-        const regex = new RegExp(`${searchPattern}`, 'i');
+        // Fetch all videos from the database
+        const allVideos = await Video.find({});
 
-        // Find matching videos with case-insensitive regex
-        const matchingVideos = await Video.find({ caption: { $regex: regex } }).sort({ caption: -1 });
+        // Create a Fuse.js instance with the videos and search options
+        const fuse = new Fuse(allVideos, {
+            keys: ['caption'],
+            threshold: 0.3 // Adjust the threshold as needed
+        });
+
+        // Perform the search
+        const matchingVideos = fuse.search(movieName).map(result => result.item);
 
         if (matchingVideos.length === 0) {
             return;
@@ -222,8 +218,18 @@ bot.action(/next_(\d+)/, async (ctx) => {
     const nextPage = currentPage + 1;
 
     const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
-    const regex = new RegExp(movieName, "i");
-    const matchingVideos = await Video.find({ caption: regex });
+
+    // Fetch all videos from the database
+    const allVideos = await Video.find({});
+
+    // Create a Fuse.js instance with the videos and search options
+    const fuse = new Fuse(allVideos, {
+        keys: ['caption'],
+        threshold: 0.3 // Adjust the threshold as needed
+    });
+
+    // Perform the search
+    const matchingVideos = fuse.search(movieName).map(result => result.item);
     const totalPages = Math.ceil(matchingVideos.length / 8);
 
     if (nextPage <= totalPages) {
@@ -245,8 +251,18 @@ bot.action(/prev_(\d+)/, async (ctx) => {
     const prevPage = currentPage - 1;
 
     const movieName = ctx.callbackQuery.message.text.split("'")[1]; // Extract movieName from message text
-    const regex = new RegExp(movieName, "i");
-    const matchingVideos = await Video.find({ caption: regex });
+
+    // Fetch all videos from the database
+    const allVideos = await Video.find({});
+
+    // Create a Fuse.js instance with the videos and search options
+    const fuse = new Fuse(allVideos, {
+        keys: ['caption'],
+        threshold: 0.3 // Adjust the threshold as needed
+    });
+
+    // Perform the search
+    const matchingVideos = fuse.search(movieName).map(result => result.item);
     const totalPages = Math.ceil(matchingVideos.length / 8);
 
     if (prevPage > 0) {
@@ -309,7 +325,6 @@ bot.on("video", async (ctx) => {
             // Store video data in MongoDB
             await storeVideoData(videoFileId, caption, videoSize);
 
-
             if (ctx.from.username === 'knox7489' || ctx.from.username === 'deepak74893') {
                 await ctx.reply("Video uploaded successfully.");
             }
@@ -325,9 +340,6 @@ bot.on("video", async (ctx) => {
         ctx.reply(`Failed to upload video: ${error.message}`);
     }
 });
-
-
-
 
 // Catch Telegraf errors
 bot.catch((err, ctx) => {
