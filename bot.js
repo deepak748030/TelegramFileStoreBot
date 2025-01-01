@@ -101,7 +101,7 @@ bot.start(async (ctx) => {
     const callbackData = message ? message.text : callbackQuery.data;
 
     if (callbackData.startsWith('/start watch_')) {
-        const chatMember = await ctx.telegram.getChatMember('@moviecast', ctx.from.id);
+        const chatMember = await ctx.telegram.getChatMember('@filmmelaupdates', ctx.from.id);
         const videoId = callbackData.split('_')[1]; // Extract video ID from the callback data
         try {
             if (chatMember.status === 'member' || chatMember.status === 'administrator' || chatMember.status === 'creator') {
@@ -123,8 +123,8 @@ bot.start(async (ctx) => {
                     return;
                 }
 
-                // Add "Join ➥ @moviecast" to the end of the caption
-                const captionWithLink = `🎥 <b>${video.title || "NOT AVAILABLE"}    📦 <b>SIZE:</b> ${bytesToMB(video.size)} </b>\n\n⚠️ <b>NOTE:</b> This video will be deleted after 10 minutes.\n\n✨ <i>Join ➥</i> @moviecast`;
+                // Add "Join ➥ @filmmelaupdates" to the end of the caption
+                const captionWithLink = `🎥 <b>${video.title || "NOT AVAILABLE"}    📦 <b>SIZE:</b> ${bytesToMB(video.size)} </b>\n\n⚠️ <b>NOTE:</b> This video will be deleted after 10 minutes.\n\n✨ <i>Join ➥</i> @filmmelaupdates`;
                 // Send the video file to the user
                 const sentMessage = await ctx.replyWithVideo(video.fileId, {
                     caption: `${captionWithLink}`,
@@ -144,7 +144,7 @@ bot.start(async (ctx) => {
                 deleteMessageAfter(ctx, sentMessage.message_id, 1000);
             } else {
                 const sentMessage = await ctx.reply(
-                    `🚀 <b>JOIN</b> @moviecast <b>TO WATCH THIS VIDEO</b> 🎥\n\n📢 <i>Unlock premium movies and exclusive content!</i>`,
+                    `🚀 <b>JOIN</b> @filmmelaupdates <b>TO WATCH THIS VIDEO</b> 🎥\n\n📢 <i>Unlock premium movies and exclusive content!</i>`,
                     {
                         parse_mode: 'HTML',
                         reply_markup: {
@@ -152,7 +152,7 @@ bot.start(async (ctx) => {
                                 [
                                     {
                                         text: '✨JOIN CHANNEL✨',
-                                        url: 'https://t.me/moviecastmovie',
+                                        url: 'https://t.me/filmmelaupdates',
                                     },
                                     // Retry button with directional and play emojis
                                     {
@@ -173,14 +173,14 @@ bot.start(async (ctx) => {
         }
     } else {
         const sentMessage = await ctx.reply(
-            `🎬 <b>Welcome to Movie-Cast Bot!</b> 🎥\n\n🌟 <i>Your gateway to amazing movies and entertainment.</i>\n\n👇 Explore now!`,
+            `🎬 <b>Welcome to Film-Mela Bot!</b> 🎥\n\n🌟 <i>Your gateway to amazing movies and entertainment.</i>\n\n👇 Explore now!`,
             {
                 parse_mode: 'HTML',
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: '🌐 Updates ', url: 'https://t.me/moviecastback' },
-                            { text: '🎞️ View Movies', url: 'https://t.me/moviecastmovie' }
+                            { text: '🌐 Updates ', url: 'https://t.me/filmmelaupdates' },
+                            { text: '🎞️ View Movies', url: 'https://t.me/filmpuradda' }
                         ]
                     ]
                 }
@@ -244,7 +244,7 @@ bot.command("moviecounts", async (ctx) => {
                 reply_markup: {
                     inline_keyboard: [
                         [
-                            { text: "🌟 Explore Movies 🌟", url: "https://t.me/moviecastmovie" }
+                            { text: "🌟 Explore Movies 🌟", url: "https://yourwebsite.com/movies" }
                         ]
                     ]
                 }
@@ -286,7 +286,7 @@ bot.on("text", async (ctx) => {
         }
 
         // Clean and prepare movie name for regex search
-        const cleanMovieName = movieName.replace(/[^\w\s]/gi, "").replace(/\s\s+/g, " ").replace(/\*/g, "").trim();
+        const cleanMovieName = movieName.replace(/[^\w\s]/gi, "").replace(/\s\s+/g, " ").trim();
         const searchPattern = cleanMovieName.split(/\s+/).map(word => `(?=.*${word})`).join("");
         const regex = new RegExp(`${searchPattern}`, "i");
 
@@ -404,13 +404,13 @@ const storeVideoData = async (fileId, caption, size) => {
 
 // Function to clean the caption by removing unwanted elements
 const cleanCaption = (caption) => {
-    // Remove links, special characters, stickers, emojis, extra spaces, and mentions except "@moviecast"
+    // Remove links, special characters, stickers, emojis, extra spaces, and mentions except "@filmmelaupdates"
     return caption
         .replace(/(?:https?|ftp):\/\/[\n\S]+/g, "") // Remove URLs
         .replace(/[^\w\s@.]/g, "") // Remove special characters except "@" and "."
         .replace(/\./g, " ") // Replace dots with a single space
         .replace(/\s\s+/g, " ") // Replace multiple spaces with a single space
-        .replace(/@[A-Za-z0-9_]+/g, "@moviecast") // Replace all mentions with "@moviecast"
+        .replace(/@[A-Za-z0-9_]+/g, "@filmmelaupdates") // Replace all mentions with "@filmmelaupdates"
         .trim();
 };
 
