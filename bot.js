@@ -3,7 +3,6 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const { Video } = require('./models/video'); // Assuming you have a Video model
 dotenv.config();
-
 let dbConnection;
 
 const connectToMongoDB = async () => {
