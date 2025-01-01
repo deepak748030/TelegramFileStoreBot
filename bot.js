@@ -490,7 +490,6 @@ bot.use((ctx, next) => {
 //     console.log('Bot started');
 // });
 
-
 // Catch Telegraf errors
 bot.catch((err, ctx) => {
     console.error('Telegraf error:', err);
